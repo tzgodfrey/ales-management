@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>销售团队管理 · 坦桑尼亚版（最终优化）</title>
+    <title>销售团队管理 · 坦桑尼亚版（最终版）</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
@@ -19,7 +19,8 @@
         .main-interface { display: none; }
         .header { background: white; border-radius: 30px; padding: 16px 24px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
         .user-badge { background: #e6f0ff; padding: 8px 18px; border-radius: 40px; font-weight: 500; color: #0066cc; }
-        .logout-btn { background: none; border: 1px solid #ddd; padding: 8px 18px; border-radius: 40px; cursor: pointer; }
+        .logout-btn, .change-pwd-btn { background: none; border: 1px solid #ddd; padding: 8px 18px; border-radius: 40px; cursor: pointer; margin-left: 8px; }
+        .change-pwd-btn { background: #f0f9ff; border-color: #0066cc; color: #0066cc; }
         .tabs { display: flex; gap: 10px; margin-bottom: 24px; flex-wrap: wrap; }
         .tab { background: white; padding: 10px 22px; border-radius: 40px; cursor: pointer; font-weight: 500; border: 1px solid #e2e8f0; }
         .tab.active { background: #0066cc; color: white; border-color: #0066cc; }
@@ -50,6 +51,11 @@
         .customer-item { background: #f9f9fc; border-radius: 16px; padding: 16px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; }
         .text-muted { color: #64748b; font-size: 0.9em; }
         input:read-only { background: #f1f5f9; cursor: not-allowed; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { text-align: left; padding: 12px; border-bottom: 1px solid #e2e8f0; }
+        .employee-actions button { margin-right: 8px; }
+        .import-section { border: 1px solid #e2e8f0; border-radius: 16px; padding: 16px; margin-top: 16px; }
+        .import-section h4 { margin-bottom: 12px; }
         @media (max-width: 700px) { .grid-2 { grid-template-columns: 1fr; } }
     </style>
 </head>
@@ -79,16 +85,20 @@
     <div id="mainInterface" class="main-interface">
         <div class="header">
             <div><strong><i class="fas fa-chart-line"></i> 坦桑销售管理</strong></div>
-            <div class="user-badge" id="currentUserDisplay"></div>
-            <button class="logout-btn" id="logoutBtn"><i class="fas fa-sign-out-alt"></i> 退出</button>
+            <div style="display: flex; align-items: center;">
+                <span class="user-badge" id="currentUserDisplay"></span>
+                <button class="change-pwd-btn" id="changePwdBtn"><i class="fas fa-key"></i> 修改密码</button>
+                <button class="logout-btn" id="logoutBtn"><i class="fas fa-sign-out-alt"></i> 退出</button>
+            </div>
         </div>
 
-        <!-- 选项卡 -->
-        <div class="tabs">
+        <!-- 选项卡（动态生成，admin会多一个员工管理） -->
+        <div class="tabs" id="tabContainer">
             <div class="tab active" data-tab="dashboard">首页看板</div>
             <div class="tab" data-tab="plans">拜访计划</div>
             <div class="tab" data-tab="receivable">应收账款</div>
             <div class="tab" data-tab="import">导入数据</div>
+            <!-- 员工管理选项卡将在admin登录后通过JS添加 -->
         </div>
 
         <!-- 首页看板 -->
@@ -134,21 +144,46 @@
 
         <!-- 应收账款 -->
         <div id="receivableTab" class="tab-content" style="display: none;">
-            <div style="margin-bottom: 20px;">
+            <div style="margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
+                <button class="btn" id="addCustomerBtn"><i class="fas fa-plus"></i> 新增客户</button>
                 <button class="btn" id="refreshReceivableBtn"><i class="fas fa-sync-alt"></i> 刷新</button>
             </div>
             <div id="receivableList"></div>
         </div>
 
-        <!-- 导入数据 -->
+        <!-- 导入数据（增强版：CSV+模板+JSON备选） -->
         <div id="importTab" class="tab-content" style="display: none;">
-            <h4>导入客户资料 (JSON格式)</h4>
-            <textarea id="importCustomerData" rows="6" style="width:100%; border-radius:16px; padding:12px; border:1px solid #ccc;">[
-  {"name": "ABC公司", "sales": "ernest", "receivable": 5000},
-  {"name": "XYZ商店", "sales": "walter", "receivable": 3200}
+            <h4>批量导入客户 (CSV格式)</h4>
+            <div style="margin-bottom: 15px;">
+                <button class="btn-outline btn" id="downloadCsvTemplate"><i class="fas fa-download"></i> 下载CSV模板</button>
+            </div>
+            <div>
+                <input type="file" id="csvFileInput" accept=".csv" style="margin-bottom: 10px;">
+                <button class="btn" id="uploadCsvBtn"><i class="fas fa-upload"></i> 上传并导入</button>
+            </div>
+            <div id="csvImportMessage" class="error" style="margin-top: 10px; white-space: pre-line;"></div>
+
+            <div class="import-section">
+                <h4>备选：JSON导入</h4>
+                <textarea id="importCustomerData" rows="4" style="width:100%; border-radius:16px; padding:12px; border:1px solid #ccc;">[
+  {"name": "ABC公司", "sales": "ernest", "receivable": 5000}
 ]</textarea>
-            <button class="btn" id="importCustomersBtn" style="margin-top:10px;">导入客户</button>
-            <div id="importMessage" style="margin-top:12px;"></div>
+                <button class="btn" id="importCustomersBtn" style="margin-top:10px;">导入客户(JSON)</button>
+                <div id="importMessage" style="margin-top:12px;"></div>
+            </div>
+        </div>
+
+        <!-- 员工管理（admin可见，通过JS动态插入） -->
+        <div id="employeesTab" class="tab-content" style="display: none;">
+            <div style="margin-bottom: 20px;">
+                <button class="btn" id="addEmployeeBtn"><i class="fas fa-user-plus"></i> 添加员工</button>
+            </div>
+            <table id="employeesTable">
+                <thead>
+                    <tr><th>用户名</th><th>操作</th></tr>
+                </thead>
+                <tbody id="employeesBody"></tbody>
+            </table>
         </div>
     </div>
 </div>
@@ -187,14 +222,14 @@
     </div>
 </div>
 
-<!-- 模态框：添加/更新收款（区分模式） -->
+<!-- 模态框：添加/更新收款 -->
 <div id="collectionModal" class="modal">
     <div class="modal-content">
         <span class="close" id="closeCollectionModal">&times;</span>
         <h3 id="collectionModalTitle">添加计划收款</h3>
         <form id="collectionForm">
             <input type="hidden" id="collectionCustomerId">
-            <input type="hidden" id="collectionExistsId"> <!-- 如果存在记录，存id -->
+            <input type="hidden" id="collectionExistsId">
             <div id="collectionPlanField">
                 <label>本周计划金额 (总额)</label>
                 <input type="number" id="collectionPlan" step="0.01" required style="width:100%; padding:10px; border-radius:40px; border:1px solid #ccc; margin-bottom:15px;">
@@ -203,6 +238,66 @@
             <input type="number" id="collectionActual" step="0.01" value="0" required style="width:100%; padding:10px; border-radius:40px; border:1px solid #ccc; margin-bottom:15px;">
             <p class="text-muted" id="collectionHint">提示：计划金额将保存为本月计划，实收金额累加到本周总额。</p>
             <button type="submit" class="btn" style="width:100%;">保存</button>
+        </form>
+    </div>
+</div>
+
+<!-- 模态框：新增客户 -->
+<div id="addCustomerModal" class="modal">
+    <div class="modal-content">
+        <span class="close" id="closeAddCustomerModal">&times;</span>
+        <h3>新增客户</h3>
+        <form id="addCustomerForm">
+            <label>客户名称</label>
+            <input type="text" id="newCustomerName" required style="width:100%; padding:10px; border-radius:40px; border:1px solid #ccc; margin-bottom:15px;">
+            <label>选择业务员</label>
+            <select id="newCustomerSales" required style="width:100%; padding:10px; border-radius:40px; border:1px solid #ccc; margin-bottom:15px;"></select>
+            <label>应收金额</label>
+            <input type="number" id="newCustomerReceivable" step="0.01" value="0" required style="width:100%; padding:10px; border-radius:40px; border:1px solid #ccc; margin-bottom:15px;">
+            <button type="submit" class="btn" style="width:100%;">保存</button>
+        </form>
+    </div>
+</div>
+
+<!-- 模态框：转移客户 -->
+<div id="transferCustomerModal" class="modal">
+    <div class="modal-content">
+        <span class="close" id="closeTransferModal">&times;</span>
+        <h3>转移客户</h3>
+        <form id="transferForm">
+            <input type="hidden" id="transferCustomerId">
+            <label>选择新业务员</label>
+            <select id="transferSalesId" required style="width:100%; padding:10px; border-radius:40px; border:1px solid #ccc; margin-bottom:15px;"></select>
+            <button type="submit" class="btn" style="width:100%;">确认转移</button>
+        </form>
+    </div>
+</div>
+
+<!-- 模态框：添加员工 -->
+<div id="addEmployeeModal" class="modal">
+    <div class="modal-content">
+        <span class="close" id="closeAddEmployeeModal">&times;</span>
+        <h3>添加员工</h3>
+        <form id="addEmployeeForm">
+            <label>用户名（仅字母）</label>
+            <input type="text" id="newEmployeeUsername" pattern="[A-Za-z]+" title="只能输入英文字母" required style="width:100%; padding:10px; border-radius:40px; border:1px solid #ccc; margin-bottom:15px;">
+            <p class="text-muted">初始密码统一为 123456</p>
+            <button type="submit" class="btn" style="width:100%;">创建员工</button>
+        </form>
+    </div>
+</div>
+
+<!-- 模态框：修改密码 -->
+<div id="changePwdModal" class="modal">
+    <div class="modal-content">
+        <span class="close" id="closeChangePwdModal">&times;</span>
+        <h3>修改密码</h3>
+        <form id="changePwdForm">
+            <label>新密码</label>
+            <input type="password" id="newPassword" required minlength="6" style="width:100%; padding:10px; border-radius:40px; border:1px solid #ccc; margin-bottom:15px;">
+            <label>确认新密码</label>
+            <input type="password" id="confirmPassword" required minlength="6" style="width:100%; padding:10px; border-radius:40px; border:1px solid #ccc; margin-bottom:15px;">
+            <button type="submit" class="btn" style="width:100%;">更新密码</button>
         </form>
     </div>
 </div>
@@ -221,6 +316,7 @@
         // ========== 配置 Supabase ==========
         const SUPABASE_URL = 'https://vocougjfdpjmosdduluz.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZvY291Z2pmZHBqbW9zZGR1bHV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzNTc1MjYsImV4cCI6MjA4NzkzMzUyNn0.cTidPQM-N08eTT7lKHP0TLXZwYb0nv3d1oDYZYLKPws';
+        // const SUPABASE_SERVICE_ROLE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZvY291Z2pmZHBqbW9zZGR1bHV6Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjM1NzUyNiwiZXhwIjoyMDg3OTMzNTI2fQ.xfCVP6RetOnOJSo1fYph7FbcXwtZaUnmDOsPhr70OnQ'; // 如果需要删除Auth用户，取消注释并填入密钥
         const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         // 全局变量
@@ -230,7 +326,7 @@
         let allVisits = [];
         let allCollections = [];
 
-        // UI 状态：已完成计划显示数量
+        // UI 状态
         let completedDisplayCount = 5;
 
         // DOM 元素
@@ -242,13 +338,26 @@
         const loginError = document.getElementById('loginError');
         const currentUserDisplay = document.getElementById('currentUserDisplay');
         const logoutBtn = document.getElementById('logoutBtn');
-        const tabs = document.querySelectorAll('.tab');
+        const changePwdBtn = document.getElementById('changePwdBtn');
+        const tabContainer = document.getElementById('tabContainer');
         const tabContents = {
             dashboard: document.getElementById('dashboardTab'),
             plans: document.getElementById('plansTab'),
             receivable: document.getElementById('receivableTab'),
-            import: document.getElementById('importTab')
+            import: document.getElementById('importTab'),
+            employees: document.getElementById('employeesTab')
         };
+
+        // 获取本周一
+        function getThisMonday() {
+            const today = new Date();
+            const day = today.getDay();
+            const diff = (day === 0 ? 6 : day - 1);
+            const monday = new Date(today);
+            monday.setDate(today.getDate() - diff);
+            monday.setHours(0, 0, 0, 0);
+            return monday;
+        }
 
         // 登录
         loginBtn.addEventListener('click', async () => {
@@ -274,6 +383,23 @@
                 mainInterface.style.display = 'block';
                 currentUserDisplay.innerText = `${currentUser.username} (${currentUser.role === 'admin' ? '主账号' : '业务员'})`;
 
+                // 动态显示员工管理选项卡（仅admin）
+                if (currentUser.role === 'admin') {
+                    if (!document.querySelector('.tab[data-tab="employees"]')) {
+                        const empTab = document.createElement('div');
+                        empTab.className = 'tab';
+                        empTab.dataset.tab = 'employees';
+                        empTab.innerText = '员工管理';
+                        tabContainer.appendChild(empTab);
+                        // 重新绑定选项卡事件
+                        bindTabs();
+                    }
+                } else {
+                    // 移除员工选项卡（如果有）
+                    const empTab = document.querySelector('.tab[data-tab="employees"]');
+                    if (empTab) empTab.remove();
+                }
+
                 await loadAllData();
             } catch (err) {
                 loginError.innerText = '登录失败：' + err.message;
@@ -287,6 +413,31 @@
             allUsers = [];
             loginSection.style.display = 'block';
             mainInterface.style.display = 'none';
+        });
+
+        // 修改密码
+        changePwdBtn.addEventListener('click', () => {
+            document.getElementById('changePwdModal').style.display = 'flex';
+        });
+        document.getElementById('closeChangePwdModal').addEventListener('click', () => {
+            document.getElementById('changePwdModal').style.display = 'none';
+        });
+        document.getElementById('changePwdForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const newPwd = document.getElementById('newPassword').value;
+            const confirmPwd = document.getElementById('confirmPassword').value;
+            if (newPwd !== confirmPwd) {
+                alert('两次输入不一致');
+                return;
+            }
+            const { error } = await supabaseClient.auth.updateUser({ password: newPwd });
+            if (error) {
+                alert('修改失败：' + error.message);
+            } else {
+                alert('密码修改成功，请重新登录');
+                await supabaseClient.auth.signOut();
+                location.reload();
+            }
         });
 
         async function loadUsers() {
@@ -323,102 +474,86 @@
             renderDashboard();
             renderPlanLists();
             renderReceivableList();
+            if (currentUser.role === 'admin') renderEmployeesList();
         }
 
-        // ========== 首页看板 ==========
- function renderDashboard() {
-    const salesUsers = allUsers.filter(u => u.role === 'sales');
-    const now = new Date();
-    const currentMonth = now.getMonth() + 1;
-    const currentYear = now.getFullYear();
-
-    // 初始化统计数据
-    const visitCounts = {};
-    const pendingCounts = {};
-    const planAmount = {};
-    const actualAmount = {};
-    salesUsers.forEach(u => {
-        visitCounts[u.id] = 0;
-        pendingCounts[u.id] = 0;
-        planAmount[u.id] = 0;
-        actualAmount[u.id] = 0;
-    });
-
-    // 统计拜访数
-    allVisits.forEach(v => {
-        const d = new Date(v.plan_date);
-        if (d.getMonth() + 1 === currentMonth && d.getFullYear() === currentYear) {
-            if (v.status === 'completed') {
-                visitCounts[v.sales_id] = (visitCounts[v.sales_id] || 0) + 1;
-            } else if (v.status === 'pending') {
-                pendingCounts[v.sales_id] = (pendingCounts[v.sales_id] || 0) + 1;
-            }
+        // 选项卡绑定
+        function bindTabs() {
+            const tabs = document.querySelectorAll('.tab');
+            tabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    const target = tab.dataset.tab;
+                    tabs.forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+                    for (let key in tabContents) {
+                        if (tabContents[key]) {
+                            tabContents[key].style.display = key === target ? 'block' : 'none';
+                        }
+                    }
+                });
+            });
         }
-    });
+        bindTabs();
 
-    // 统计收款（带详细调试）
-    console.log('===== 收款统计调试 =====');
-    console.log('当前月份:', currentYear + '-' + currentMonth);
-    console.log('allCollections 数据:', allCollections);
+        // ========== 首页看板（已修复） ==========
+        function renderDashboard() {
+            const salesUsers = allUsers.filter(u => u.role === 'sales');
+            const now = new Date();
+            const currentMonth = now.getMonth() + 1;
+            const currentYear = now.getFullYear();
 
-    allCollections.forEach((c, index) => {
-        console.log(`记录 ${index}:`, c);
+            const visitCounts = {};
+            const pendingCounts = {};
+            const planAmount = {};
+            const actualAmount = {};
+            salesUsers.forEach(u => {
+                visitCounts[u.id] = 0;
+                pendingCounts[u.id] = 0;
+                planAmount[u.id] = 0;
+                actualAmount[u.id] = 0;
+            });
 
-        // 解析日期
-        const weekStart = c.week_start;
-        const d = new Date(weekStart);
-        console.log(`  解析日期: ${d}, isValid: ${!isNaN(d.getTime())}`);
+            allVisits.forEach(v => {
+                const d = new Date(v.plan_date);
+                if (d.getMonth() + 1 === currentMonth && d.getFullYear() === currentYear) {
+                    if (v.status === 'completed') visitCounts[v.sales_id] = (visitCounts[v.sales_id] || 0) + 1;
+                    else if (v.status === 'pending') pendingCounts[v.sales_id] = (pendingCounts[v.sales_id] || 0) + 1;
+                }
+            });
 
-        if (isNaN(d.getTime())) {
-            console.warn(`  跳过: 无效日期 ${weekStart}`);
-            return;
+            allCollections.forEach(c => {
+                const d = new Date(c.week_start);
+                if (d.getMonth() + 1 === currentMonth && d.getFullYear() === currentYear) {
+                    const salesId = Number(c.sales_id);
+                    planAmount[salesId] = (planAmount[salesId] || 0) + (Number(c.plan_amount) || 0);
+                    actualAmount[salesId] = (actualAmount[salesId] || 0) + (Number(c.actual_amount) || 0);
+                }
+            });
+
+            const visitRank = salesUsers.map(u => ({ username: u.username, value: visitCounts[u.id] || 0 }))
+                .sort((a,b) => b.value - a.value);
+            const pendingRank = salesUsers.map(u => ({ username: u.username, value: pendingCounts[u.id] || 0 }))
+                .sort((a,b) => b.value - a.value);
+            const planRank = salesUsers.map(u => ({ username: u.username, value: planAmount[u.id] || 0 }))
+                .sort((a,b) => b.value - a.value);
+            const completionRank = salesUsers.map(u => {
+                const plan = planAmount[u.id] || 0;
+                const actual = actualAmount[u.id] || 0;
+                const pct = plan > 0 ? ((actual / plan) * 100).toFixed(0) : 0;
+                return { username: u.username, value: pct };
+            }).sort((a,b) => b.value - a.value);
+
+            document.getElementById('rankVisits').innerHTML = visitRank.map(r =>
+                `<div class="rank-item"><span>${r.username}</span><strong>${r.value}</strong></div>`).join('');
+            document.getElementById('rankPending').innerHTML = pendingRank.map(r =>
+                `<div class="rank-item"><span>${r.username}</span><strong>${r.value}</strong></div>`).join('');
+            document.getElementById('rankPlan').innerHTML = planRank.map(r =>
+                `<div class="rank-item"><span>${r.username}</span><strong>$${Number(r.value).toFixed(2)}</strong></div>`).join('');
+            document.getElementById('rankCompletion').innerHTML = completionRank.map(r =>
+                `<div class="rank-item"><span>${r.username}</span><strong>${r.value}%</strong></div>`).join('');
         }
 
-        const recordMonth = d.getMonth() + 1;
-        const recordYear = d.getFullYear();
-        console.log(`  记录月份: ${recordYear}-${recordMonth}`);
-
-        if (recordMonth === currentMonth && recordYear === currentYear) {
-            const salesId = Number(c.sales_id); // 强制转为数字
-            const plan = Number(c.plan_amount) || 0;
-            const actual = Number(c.actual_amount) || 0;
-            console.log(`  匹配! salesId=${salesId}, plan=${plan}, actual=${actual}`);
-
-            planAmount[salesId] = (planAmount[salesId] || 0) + plan;
-            actualAmount[salesId] = (actualAmount[salesId] || 0) + actual;
-        } else {
-            console.log(`  月份不匹配, 跳过`);
-        }
-    });
-
-    console.log('计划金额汇总:', planAmount);
-    console.log('实际金额汇总:', actualAmount);
-
-    // 构建排名数组
-    const visitRank = salesUsers.map(u => ({ username: u.username, value: visitCounts[u.id] || 0 }))
-        .sort((a, b) => b.value - a.value);
-    const pendingRank = salesUsers.map(u => ({ username: u.username, value: pendingCounts[u.id] || 0 }))
-        .sort((a, b) => b.value - a.value);
-    const planRank = salesUsers.map(u => ({ username: u.username, value: planAmount[u.id] || 0 }))
-        .sort((a, b) => b.value - a.value);
-    const completionRank = salesUsers.map(u => {
-        const plan = planAmount[u.id] || 0;
-        const actual = actualAmount[u.id] || 0;
-        const pct = plan > 0 ? ((actual / plan) * 100).toFixed(0) : 0;
-        return { username: u.username, value: pct };
-    }).sort((a, b) => b.value - a.value);
-
-    // 更新DOM
-    document.getElementById('rankVisits').innerHTML = visitRank.map(r =>
-        `<div class="rank-item"><span>${r.username}</span><strong>${r.value}</strong></div>`).join('');
-    document.getElementById('rankPending').innerHTML = pendingRank.map(r =>
-        `<div class="rank-item"><span>${r.username}</span><strong>${r.value}</strong></div>`).join('');
-    document.getElementById('rankPlan').innerHTML = planRank.map(r =>
-        `<div class="rank-item"><span>${r.username}</span><strong>$${Number(r.value).toFixed(2)}</strong></div>`).join('');
-    document.getElementById('rankCompletion').innerHTML = completionRank.map(r =>
-        `<div class="rank-item"><span>${r.username}</span><strong>${r.value}%</strong></div>`).join('');
-}
-        // ========== 拜访计划列表（拆分未完成/已完成，两行布局） ==========
+        // ========== 拜访计划 ==========
         function renderPlanLists() {
             const pendingVisits = allVisits.filter(v => v.status === 'pending')
                 .sort((a,b) => new Date(a.plan_date) - new Date(b.plan_date));
@@ -436,7 +571,6 @@
                 return;
             }
 
-            // 只显示前10条（超过10条通过容器滚动查看）
             const displayVisits = visits.slice(0, 10);
             container.innerHTML = displayVisits.map(v => {
                 const customer = allCustomers.find(c => c.id === v.customer_id) || { name: '未知客户' };
@@ -518,33 +652,20 @@
             }
         }
 
-        // 删除计划
         window.deleteVisit = async function(visitId) {
             if (!confirm('确定删除该计划吗？')) return;
-            // 可选：检查权限（这里只简单删除，如果RLS未开启则直接删除）
-            const { error } = await supabaseClient
-                .from('visits')
-                .delete()
-                .eq('id', visitId);
-            if (error) {
-                alert('删除失败：' + error.message);
-            } else {
-                await loadAllData();
-            }
+            const { error } = await supabaseClient.from('visits').delete().eq('id', visitId);
+            if (error) alert('删除失败：' + error.message);
+            else await loadAllData();
         };
 
-        // 展开更多已完成计划
         document.getElementById('showMoreCompletedBtn').addEventListener('click', () => {
             const completedVisits = allVisits.filter(v => v.status === 'completed');
-            if (completedDisplayCount === 5) {
-                completedDisplayCount = 10;
-            } else {
-                completedDisplayCount += 5;
-            }
+            if (completedDisplayCount === 5) completedDisplayCount = 10;
+            else completedDisplayCount += 5;
             renderCompletedList(completedVisits);
         });
 
-        // 打开完成拜访模态框
         window.openCompleteModal = function(visitId) {
             const visit = allVisits.find(v => v.id === visitId);
             document.getElementById('completeVisitId').value = visitId;
@@ -553,7 +674,6 @@
             document.getElementById('completeVisitModal').style.display = 'flex';
         };
 
-        // 提交完成拜访
         document.getElementById('completeForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const visitId = document.getElementById('completeVisitId').value;
@@ -567,27 +687,20 @@
                     reader.readAsDataURL(photoFile);
                 });
             }
-
-            const { error } = await supabaseClient
-                .from('visits')
-                .update({
-                    status: 'completed',
-                    evaluation: evaluation,
-                    photo_url: photoUrl,
-                    actual_date: new Date().toISOString().split('T')[0]
-                })
-                .eq('id', visitId);
-
-            if (error) {
-                alert('更新失败：' + error.message);
-            } else {
+            const { error } = await supabaseClient.from('visits').update({
+                status: 'completed',
+                evaluation: evaluation,
+                photo_url: photoUrl,
+                actual_date: new Date().toISOString().split('T')[0]
+            }).eq('id', visitId);
+            if (error) alert('更新失败：' + error.message);
+            else {
                 document.getElementById('completeVisitModal').style.display = 'none';
                 await loadAllData();
-                completedDisplayCount = 5; // 重置显示数量
+                completedDisplayCount = 5;
             }
         });
 
-        // 新建计划按钮
         document.getElementById('addPlanBtn').addEventListener('click', () => {
             openPlanModal();
         });
@@ -599,27 +712,20 @@
                 customersForSelect = allCustomers.filter(c => c.sales_id === currentUser.id);
             }
             select.innerHTML = customersForSelect.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
-
             document.getElementById('planId').value = '';
             document.getElementById('planDate').value = new Date().toISOString().split('T')[0];
             document.getElementById('planEvaluation').value = '';
             document.getElementById('planModal').style.display = 'flex';
         }
 
-        // 保存新建计划
         document.getElementById('planForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const customerId = document.getElementById('planCustomerId').value;
             const planDate = document.getElementById('planDate').value;
             const evaluation = document.getElementById('planEvaluation').value;
-
             const customer = allCustomers.find(c => c.id === parseInt(customerId));
-            if (!customer) {
-                alert('客户不存在');
-                return;
-            }
+            if (!customer) { alert('客户不存在'); return; }
             const salesId = customer.sales_id;
-
             const { error } = await supabaseClient.from('visits').insert({
                 customer_id: customerId,
                 sales_id: salesId,
@@ -629,21 +735,11 @@
                 photo_url: '',
                 actual_date: null
             });
-
-            if (error) {
-                alert('保存失败：' + error.message);
-            } else {
+            if (error) alert('保存失败：' + error.message);
+            else {
                 document.getElementById('planModal').style.display = 'none';
                 await loadAllData();
             }
-        });
-
-        // 关闭模态框
-        document.getElementById('closePlanModal').addEventListener('click', () => {
-            document.getElementById('planModal').style.display = 'none';
-        });
-        document.getElementById('closeCompleteModal').addEventListener('click', () => {
-            document.getElementById('completeVisitModal').style.display = 'none';
         });
 
         // ========== 应收账款 ==========
@@ -654,10 +750,7 @@
                 return;
             }
 
-            const today = new Date();
-            const day = today.getDay();
-            const diff = today.getDate() - day + (day === 0 ? -6 : 1);
-            const monday = new Date(today.setDate(diff));
+            const monday = getThisMonday();
             const weekStart = monday.toISOString().split('T')[0];
 
             container.innerHTML = allCustomers.map(c => {
@@ -677,6 +770,7 @@
                         </div>
                         <div style="display: flex; gap: 8px;">
                             <button class="${buttonClass} btn" onclick="openCollectionModal(${c.id}, ${plan}, ${actual}, ${hasPlan}, '${weekCol ? weekCol.id : ''}')">${buttonText}</button>
+                            ${currentUser.role === 'admin' ? `<button class="btn-outline btn" onclick="openTransferModal(${c.id})">转移</button>` : ''}
                         </div>
                     </div>
                 `;
@@ -686,26 +780,23 @@
         window.openCollectionModal = function(customerId, currentPlan, currentActual, hasPlan, collectionId) {
             const modalTitle = document.getElementById('collectionModalTitle');
             const planInput = document.getElementById('collectionPlan');
-            const planField = document.getElementById('collectionPlanField');
             const hint = document.getElementById('collectionHint');
             const existsIdInput = document.getElementById('collectionExistsId');
 
             document.getElementById('collectionCustomerId').value = customerId;
-            document.getElementById('collectionActual').value = 0; // 默认为0，用户可修改
+            document.getElementById('collectionActual').value = 0;
 
             if (hasPlan) {
-                // 更新模式：计划金额只读，不可修改
                 modalTitle.innerText = '更新收款';
                 planInput.value = currentPlan;
                 planInput.readOnly = true;
-                hint.innerText = '提示：计划金额不可修改，仅可增加本次实收金额。';
+                hint.innerText = '计划金额不可修改，仅可增加本次实收。';
                 existsIdInput.value = collectionId;
             } else {
-                // 添加模式：计划金额可输入，默认0
                 modalTitle.innerText = '添加计划收款';
                 planInput.value = 0;
                 planInput.readOnly = false;
-                hint.innerText = '提示：计划金额将保存为本月计划，实收金额可累加。';
+                hint.innerText = '计划金额将保存为本月计划，实收金额可累加。';
                 existsIdInput.value = '';
             }
             document.getElementById('collectionModal').style.display = 'flex';
@@ -717,86 +808,243 @@
             const plan = parseFloat(document.getElementById('collectionPlan').value) || 0;
             const actualIncrement = parseFloat(document.getElementById('collectionActual').value) || 0;
             const existsId = document.getElementById('collectionExistsId').value;
-
             const customer = allCustomers.find(c => c.id === parseInt(customerId));
-            if (!customer) {
-                alert('客户不存在');
-                return;
-            }
+            if (!customer) { alert('客户不存在'); return; }
             const salesId = customer.sales_id;
-
-            const today = new Date();
-            const day = today.getDay();
-            const diff = today.getDate() - day + (day === 0 ? -6 : 1);
-            const monday = new Date(today.setDate(diff));
+            const monday = getThisMonday();
             const weekStart = monday.toISOString().split('T')[0];
 
             if (existsId) {
-                // 更新模式：只累加实际金额，计划金额不变
-                const { data: existing } = await supabaseClient
-                    .from('collections')
-                    .select('actual_amount')
-                    .eq('id', existsId)
-                    .single();
+                const { data: existing } = await supabaseClient.from('collections').select('actual_amount').eq('id', existsId).single();
                 if (existing) {
                     const newActual = (existing.actual_amount || 0) + actualIncrement;
-                    const { error } = await supabaseClient
-                        .from('collections')
-                        .update({ actual_amount: newActual })
-                        .eq('id', existsId);
+                    const { error } = await supabaseClient.from('collections').update({ actual_amount: newActual }).eq('id', existsId);
                     if (error) alert('更新失败：' + error.message);
                 }
             } else {
-                // 添加模式：插入新记录，计划金额为输入的plan，实际金额为输入的actualIncrement
-                const { error } = await supabaseClient
-                    .from('collections')
-                    .insert({
-                        customer_id: customerId,
-                        sales_id: salesId,
-                        week_start: weekStart,
-                        plan_amount: plan,
-                        actual_amount: actualIncrement
-                    });
+                const { error } = await supabaseClient.from('collections').insert({
+                    customer_id: customerId,
+                    sales_id: salesId,
+                    week_start: weekStart,
+                    plan_amount: plan,
+                    actual_amount: actualIncrement
+                });
                 if (error) alert('添加失败：' + error.message);
             }
-
             document.getElementById('collectionModal').style.display = 'none';
             await loadAllData();
         });
 
-        document.getElementById('closeCollectionModal').addEventListener('click', () => {
-            document.getElementById('collectionModal').style.display = 'none';
+        // 新增客户
+        document.getElementById('addCustomerBtn').addEventListener('click', () => {
+            const select = document.getElementById('newCustomerSales');
+            select.innerHTML = allUsers.filter(u => u.role === 'sales').map(u => `<option value="${u.id}">${u.username}</option>`).join('');
+            document.getElementById('addCustomerModal').style.display = 'flex';
+        });
+        document.getElementById('closeAddCustomerModal').addEventListener('click', () => {
+            document.getElementById('addCustomerModal').style.display = 'none';
+        });
+        document.getElementById('addCustomerForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const name = document.getElementById('newCustomerName').value.trim();
+            const salesId = document.getElementById('newCustomerSales').value;
+            const receivable = parseFloat(document.getElementById('newCustomerReceivable').value) || 0;
+            if (!name) return alert('客户名称不能为空');
+            const { error } = await supabaseClient.from('customers').insert({ name, sales_id: salesId, receivable });
+            if (error) alert('添加失败：' + error.message);
+            else {
+                document.getElementById('addCustomerModal').style.display = 'none';
+                await loadAllData();
+            }
         });
 
-        // ========== 客户历史 ==========
-        window.showHistory = async function(customerId) {
-            const customer = allCustomers.find(c => c.id === customerId);
-            document.getElementById('historyCustomerName').innerText = customer ? customer.name : '客户历史';
-            const { data } = await supabaseClient
-                .from('visits')
-                .select('*')
-                .eq('customer_id', customerId)
-                .order('plan_date', { ascending: false });
-            const historyList = document.getElementById('historyList');
-            if (!data || data.length === 0) {
-                historyList.innerHTML = '<p>暂无拜访记录</p>';
-            } else {
-                historyList.innerHTML = data.map(v => `
-                    <div class="history-item">
-                        <div><strong>${v.plan_date}</strong> ${v.status === 'completed' ? '✅ 已完成' : '⏳ 未完成'}</div>
-                        ${v.evaluation ? '<p>备注：'+v.evaluation+'</p>' : ''}
-                        ${v.photo_url ? '<div class="photo-placeholder"><i class="fas fa-image"></i> 有照片</div>' : ''}
-                    </div>
-                `).join('');
+        // 转移客户
+        window.openTransferModal = function(customerId) {
+            document.getElementById('transferCustomerId').value = customerId;
+            const select = document.getElementById('transferSalesId');
+            select.innerHTML = allUsers.filter(u => u.role === 'sales').map(u => `<option value="${u.id}">${u.username}</option>`).join('');
+            document.getElementById('transferCustomerModal').style.display = 'flex';
+        };
+        document.getElementById('closeTransferModal').addEventListener('click', () => {
+            document.getElementById('transferCustomerModal').style.display = 'none';
+        });
+        document.getElementById('transferForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const customerId = document.getElementById('transferCustomerId').value;
+            const newSalesId = document.getElementById('transferSalesId').value;
+            const { error } = await supabaseClient.from('customers').update({ sales_id: newSalesId }).eq('id', customerId);
+            if (error) alert('转移失败：' + error.message);
+            else {
+                document.getElementById('transferCustomerModal').style.display = 'none';
+                await loadAllData();
             }
-            document.getElementById('historyModal').style.display = 'flex';
+        });
+
+        // ========== 员工管理 ==========
+        function renderEmployeesList() {
+            const tbody = document.getElementById('employeesBody');
+            const salesUsers = allUsers.filter(u => u.role === 'sales');
+            tbody.innerHTML = salesUsers.map(u => `
+                <tr>
+                    <td>${u.username}</td>
+                    <td class="employee-actions">
+                        <button class="btn-small btn-danger" onclick="deleteEmployee(${u.id}, '${u.username}')">删除</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        window.deleteEmployee = async function(userId, username) {
+            if (!confirm(`确定删除员工 ${username} 吗？该员工名下的客户将自动转移给 admin。`)) return;
+            // 1. 将该员工名下的客户转给 admin
+            const adminUser = allUsers.find(u => u.role === 'admin');
+            if (!adminUser) { alert('未找到admin账号'); return; }
+            const { error: updateErr } = await supabaseClient.from('customers').update({ sales_id: adminUser.id }).eq('sales_id', userId);
+            if (updateErr) { alert('转移客户失败：' + updateErr.message); return; }
+
+            // 2. 删除 Auth 用户（如果需要真正删除，需要服务角色密钥。这里先尝试用服务角色，若没有则仅删除users记录）
+            try {
+                // 如果有服务角色密钥，可以调用auth API
+                if (typeof SUPABASE_SERVICE_ROLE_KEY !== 'undefined') {
+                    const adminAuthClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
+                    // 需要先获取用户的auth id，可以通过email查询
+                    const email = username + '@local.host';
+                    const { data: userList, error: listErr } = await adminAuthClient.auth.admin.listUsers();
+                    if (listErr) throw listErr;
+                    const target = userList.users.find(u => u.email === email);
+                    if (target) {
+                        await adminAuthClient.auth.admin.deleteUser(target.id);
+                    } else {
+                        console.warn('Auth用户未找到，跳过删除');
+                    }
+                }
+            } catch (err) {
+                console.warn('删除Auth用户失败（可能无权限），仅删除users记录', err);
+            }
+
+            // 3. 删除 users 记录
+            const { error: delErr } = await supabaseClient.from('users').delete().eq('id', userId);
+            if (delErr) { alert('删除员工失败：' + delErr.message); return; }
+
+            // 重新加载数据
+            await loadUsers();
+            if (currentUser.role === 'admin') renderEmployeesList();
+            await loadAllData(); // 刷新其他列表，客户归属已变
         };
 
-        document.getElementById('closeHistory').addEventListener('click', () => {
-            document.getElementById('historyModal').style.display = 'none';
+        document.getElementById('addEmployeeBtn').addEventListener('click', () => {
+            document.getElementById('addEmployeeModal').style.display = 'flex';
+        });
+        document.getElementById('closeAddEmployeeModal').addEventListener('click', () => {
+            document.getElementById('addEmployeeModal').style.display = 'none';
+        });
+        document.getElementById('addEmployeeForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('newEmployeeUsername').value.trim();
+            if (!/^[A-Za-z]+$/.test(username)) {
+                alert('用户名只能包含英文字母');
+                return;
+            }
+            // 检查users表是否已存在
+            if (allUsers.some(u => u.username === username)) {
+                alert('用户名已存在');
+                return;
+            }
+            // 创建Auth用户
+            const email = username + '@local.host';
+            const password = '123456';
+            try {
+                const { data, error: signUpErr } = await supabaseClient.auth.signUp({ email, password });
+                if (signUpErr) throw signUpErr;
+                // 插入users表
+                const { error: insertErr } = await supabaseClient.from('users').insert({ username, role: 'sales' });
+                if (insertErr) throw insertErr;
+                alert('员工创建成功，初始密码 123456');
+                document.getElementById('addEmployeeModal').style.display = 'none';
+                await loadUsers();
+                if (currentUser.role === 'admin') renderEmployeesList();
+            } catch (err) {
+                alert('创建失败：' + err.message);
+            }
         });
 
-        // ========== 导入客户 ==========
+        // ========== CSV导入 ==========
+        document.getElementById('downloadCsvTemplate').addEventListener('click', () => {
+            const headers = ['客户名称', '业务员用户名', '应收金额'];
+            const example = ['示例公司', 'ernest', '5,000.00'];
+            const csvContent = [headers.join(','), example.join(',')].join('\n');
+            const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' }); // 加BOM支持中文
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = '客户导入模板.csv';
+            link.click();
+        });
+
+        document.getElementById('uploadCsvBtn').addEventListener('click', async () => {
+            const fileInput = document.getElementById('csvFileInput');
+            const file = fileInput.files[0];
+            if (!file) { alert('请选择CSV文件'); return; }
+            const text = await file.text();
+            const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
+            if (lines.length < 2) { alert('CSV文件至少需要标题行和一行数据'); return; }
+
+            const header = lines[0].split(',').map(s => s.trim());
+            const nameIdx = header.indexOf('客户名称');
+            const salesIdx = header.indexOf('业务员用户名');
+            const amountIdx = header.indexOf('应收金额');
+            if (nameIdx === -1 || salesIdx === -1 || amountIdx === -1) {
+                alert('CSV标题必须包含：客户名称, 业务员用户名, 应收金额');
+                return;
+            }
+
+            const success = [];
+            const failed = [];
+            for (let i = 1; i < lines.length; i++) {
+                const cols = lines[i].split(',').map(s => s.trim().replace(/^"|"$/g, '')); // 简单去引号
+                const name = cols[nameIdx];
+                const salesUsername = cols[salesIdx];
+                let amountStr = cols[amountIdx].replace(/,/g, ''); // 移除千分符
+                const amount = parseFloat(amountStr) || 0;
+
+                if (!name || !salesUsername) {
+                    failed.push(`行 ${i+1}: 缺少必要字段`);
+                    continue;
+                }
+
+                // 查找业务员
+                const salesUser = allUsers.find(u => u.username === salesUsername && u.role === 'sales');
+                if (!salesUser) {
+                    failed.push(`行 ${i+1}: 业务员 ${salesUsername} 不存在`);
+                    continue;
+                }
+
+                // 检查客户是否已存在（同名）
+                const existing = allCustomers.find(c => c.name === name);
+                if (existing) {
+                    failed.push(`行 ${i+1}: 客户名 "${name}" 已存在，跳过`);
+                    continue;
+                }
+
+                // 插入
+                const { error } = await supabaseClient.from('customers').insert({
+                    name,
+                    sales_id: salesUser.id,
+                    receivable: amount
+                });
+                if (error) {
+                    failed.push(`行 ${i+1}: ${error.message}`);
+                } else {
+                    success.push(name);
+                }
+            }
+
+            const msg = `导入完成。成功: ${success.length} 条，失败: ${failed.length} 条。\n失败详情：\n${failed.join('\n')}`;
+            document.getElementById('csvImportMessage').innerText = msg;
+            fileInput.value = '';
+            await loadAllData();
+        });
+
+        // ========== JSON导入（原有） ==========
         document.getElementById('importCustomersBtn').addEventListener('click', async () => {
             const raw = document.getElementById('importCustomerData').value;
             try {
@@ -806,6 +1054,11 @@
                     const salesUser = allUsers.find(u => u.username === item.sales);
                     if (!salesUser) {
                         errors.push(`业务员 ${item.sales} 不存在，跳过`);
+                        continue;
+                    }
+                    // 检查重名
+                    if (allCustomers.some(c => c.name === item.name)) {
+                        errors.push(`客户名 "${item.name}" 已存在，跳过`);
                         continue;
                     }
                     const { error } = await supabaseClient.from('customers').insert({
@@ -826,27 +1079,43 @@
             }
         });
 
-        document.getElementById('refreshReceivableBtn').addEventListener('click', loadAllData);
-
-        // 选项卡切换
-        tabs.forEach(tab => {
-            tab.addEventListener('click', () => {
-                const target = tab.dataset.tab;
-                tabs.forEach(t => t.classList.remove('active'));
-                tab.classList.add('active');
-                for (let key in tabContents) {
-                    tabContents[key].style.display = key === target ? 'block' : 'none';
-                }
-            });
-        });
-
-        // 点击模态框外部关闭
-        window.addEventListener('click', (e) => {
-            if (e.target.classList.contains('modal')) {
-                e.target.style.display = 'none';
+        // ========== 客户历史 ==========
+        window.showHistory = async function(customerId) {
+            const customer = allCustomers.find(c => c.id === customerId);
+            document.getElementById('historyCustomerName').innerText = customer ? customer.name : '客户历史';
+            const { data } = await supabaseClient.from('visits').select('*').eq('customer_id', customerId).order('plan_date', { ascending: false });
+            const historyList = document.getElementById('historyList');
+            if (!data || data.length === 0) {
+                historyList.innerHTML = '<p>暂无拜访记录</p>';
+            } else {
+                historyList.innerHTML = data.map(v => `
+                    <div class="history-item">
+                        <div><strong>${v.plan_date}</strong> ${v.status === 'completed' ? '✅ 已完成' : '⏳ 未完成'}</div>
+                        ${v.evaluation ? '<p>备注：'+v.evaluation+'</p>' : ''}
+                        ${v.photo_url ? '<div class="photo-placeholder"><i class="fas fa-image"></i> 有照片</div>' : ''}
+                    </div>
+                `).join('');
             }
+            document.getElementById('historyModal').style.display = 'flex';
+        };
+
+        document.getElementById('closeHistory').addEventListener('click', () => {
+            document.getElementById('historyModal').style.display = 'none';
+        });
+        document.getElementById('refreshReceivableBtn').addEventListener('click', loadAllData);
+        document.getElementById('closePlanModal').addEventListener('click', () => {
+            document.getElementById('planModal').style.display = 'none';
+        });
+        document.getElementById('closeCompleteModal').addEventListener('click', () => {
+            document.getElementById('completeVisitModal').style.display = 'none';
+        });
+        document.getElementById('closeCollectionModal').addEventListener('click', () => {
+            document.getElementById('collectionModal').style.display = 'none';
         });
 
+        window.addEventListener('click', (e) => {
+            if (e.target.classList.contains('modal')) e.target.style.display = 'none';
+        });
         document.querySelectorAll('.close').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.target.closest('.modal').style.display = 'none';

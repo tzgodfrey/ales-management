@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sales Management · Tanzania</title>
+    <title>华亿汽配 · 销售管理</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
@@ -22,6 +22,7 @@
         .user-badge { background: #e6f0ff; padding: 8px 18px; border-radius: 40px; font-weight: 500; color: #0066cc; }
         .lang-btn, .logout-btn, .change-pwd-btn { background: none; border: 1px solid #ddd; padding: 8px 18px; border-radius: 40px; cursor: pointer; margin-left: 8px; }
         .lang-btn { background: #f0f9ff; border-color: #0066cc; color: #0066cc; }
+        .slogan { margin-right: 15px; color: #0066cc; font-weight: 500; font-style: italic; }
         .tabs { display: flex; gap: 10px; margin-bottom: 24px; flex-wrap: wrap; }
         .tab { background: white; padding: 10px 22px; border-radius: 40px; cursor: pointer; font-weight: 500; border: 1px solid #e2e8f0; }
         .tab.active { background: #0066cc; color: white; border-color: #0066cc; }
@@ -66,7 +67,7 @@
 <div class="app-container">
     <!-- 登录界面 -->
     <div id="loginSection" class="login-card">
-        <h2 id="loginTitle"><i class="fas fa-users" style="margin-right: 10px;"></i>Sales Team Login</h2>
+        <h2 id="loginTitle"><i class="fas fa-users" style="margin-right: 10px;"></i>HuaYi Auto Parts</h2>
         <div>
             <label id="selectAccountLabel">Select Account</label>
             <select id="usernameSelect">
@@ -89,8 +90,9 @@
     <!-- 主界面 -->
     <div id="mainInterface" class="main-interface">
         <div class="header">
-            <div><strong><i class="fas fa-chart-line"></i> <span id="appTitle">Tanzania Sales Management</span></strong></div>
+            <div><strong><i class="fas fa-chart-line"></i> <span id="appTitle">HuaYi Sales Team Welcome You</span></strong></div>
             <div class="header-controls">
+                <span class="slogan" id="slogan">✨ Every visit is a step to success!</span>
                 <span class="user-badge" id="currentUserDisplay"></span>
                 <button class="lang-btn" id="langToggle">中文</button>
                 <button class="change-pwd-btn" id="changePwdBtn"><i class="fas fa-key"></i> <span id="changePwdBtnText">Change Password</span></button>
@@ -115,6 +117,7 @@
                     <option value="thisMonth" id="rangeThisMonth">This Month</option>
                     <option value="lastMonth" id="rangeLastMonth">Last Month</option>
                     <option value="last3Months" id="rangeLast3Months">Last 3 Months</option>
+                    <option value="last6Months" id="rangeLast6Months">Last 6 Months</option>
                 </select>
             </div>
             <div class="grid-2">
@@ -158,6 +161,9 @@
             <div style="margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
                 <button class="btn" id="addCustomerBtn"><i class="fas fa-plus"></i> <span id="addCustomerBtnText">Add Customer</span></button>
                 <button class="btn" id="refreshReceivableBtn"><i class="fas fa-sync-alt"></i> <span id="refreshBtnText">Refresh</span></button>
+            </div>
+            <div style="margin: 10px 0 15px 0; color: #0066cc; font-weight: 500; text-align: center;" id="receivableSlogan">
+                ⭐ Timely collection makes performance better!
             </div>
             <div id="receivableList"></div>
         </div>
@@ -226,7 +232,7 @@
             <input type="hidden" id="completeVisitId">
             <label id="completeEvalLabel">Notes (Feedback/Evaluation)</label>
             <textarea id="completeEvaluation" rows="3" required style="width:100%; border-radius:16px; padding:10px; border:1px solid #ccc; margin-bottom:15px;" placeholder="Enter visit outcome and feedback"></textarea>
-            <label id="completePhotoLabel">Upload Photo (simulated)</label>
+            <label id="completePhotoLabel">Upload Photo</label>
             <input type="file" id="completePhoto" accept="image/*" style="margin:10px 0;">
             <button type="submit" class="btn" style="width:100%;" id="completeSubmitBtn">Submit</button>
         </form>
@@ -313,7 +319,7 @@
     </div>
 </div>
 
-<!-- 模态框：查看客户历史 -->
+<!-- 模态框：查看客户拜访历史 -->
 <div id="historyModal" class="modal">
     <div class="modal-content">
         <span class="close" id="closeHistory">&times;</span>
@@ -336,23 +342,20 @@
         // ========== 配置 Supabase ==========
         const SUPABASE_URL = 'https://vocougjfdpjmosdduluz.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZvY291Z2pmZHBqbW9zZGR1bHV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzNTc1MjYsImV4cCI6MjA4NzkzMzUyNn0.cTidPQM-N08eTT7lKHP0TLXZwYb0nv3d1oDYZYLKPws';
-        // 服务角色密钥（可选）
-        // const SUPABASE_SERVICE_ROLE_KEY = '服务密钥';
-
+        // 服务角色密钥已安全移除，删除员工时将不会删除 Auth 用户
         const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         // ========== 语言配置 ==========
-        let currentLang = 'en'; // 'en' or 'zh'
+        let currentLang = 'en';
         const i18n = {
             en: {
-                // 登录界面
-                loginTitle: 'Sales Team Login',
+                loginTitle: 'HuaYi Auto Parts',
                 selectAccountLabel: 'Select Account',
                 passwordLabel: 'Password',
                 loginBtnText: 'Login',
                 loginHint: 'Default password is 123456, can be changed after login.',
-                // 主界面
-                appTitle: 'Tanzania Sales Management',
+                appTitle: 'HuaYi Sales Team Welcome You',
+                slogan: '✨ Every visit is a step to success!',
                 changePwdBtnText: 'Change Password',
                 logoutBtnText: 'Logout',
                 tabDashboard: 'Dashboard',
@@ -360,34 +363,30 @@
                 tabReceivable: 'Receivables',
                 tabImport: 'Import Data',
                 tabEmployees: 'Employee Management',
-                // 首页
                 dashboardTitle: 'Monthly Rankings',
                 rangeThisMonth: 'This Month',
                 rangeLastMonth: 'Last Month',
                 rangeLast3Months: 'Last 3 Months',
+                rangeLast6Months: 'Last 6 Months',
                 rankVisitsTitle: 'Visits Completed',
                 rankPendingTitle: 'Pending Plans',
                 rankPlanTitle: 'Planned Amount',
                 rankCompletionTitle: 'Completion %',
-                // 拜访计划
                 addPlanBtnText: 'New Visit Plan',
                 pendingPlansTitle: 'Pending Plans',
                 completedPlansTitle: 'Completed Plans',
                 showMoreText: 'Show more',
-                // 应收账款
                 addCustomerBtnText: 'Add Customer',
                 refreshBtnText: 'Refresh',
-                // 导入数据
+                receivableSlogan: '⭐ Timely collection makes performance better!',
                 importExcelTitle: 'Batch Import Customers (Excel)',
                 downloadTemplateText: 'Download Excel Template',
                 uploadBtnText: 'Upload & Import',
                 jsonImportTitle: 'Alternative: JSON Import',
                 importJsonBtnText: 'Import (JSON)',
-                // 员工管理
                 addEmployeeBtnText: 'Add Employee',
                 empUsernameHeader: 'Username',
                 empActionsHeader: 'Actions',
-                // 模态框通用
                 planModalTitle: 'New Visit Plan',
                 planCustomerLabel: 'Select Customer',
                 planDateLabel: 'Planned Date',
@@ -395,7 +394,7 @@
                 planSaveBtn: 'Save Plan',
                 completeTitle: 'Complete Visit',
                 completeEvalLabel: 'Notes (Feedback/Evaluation)',
-                completePhotoLabel: 'Upload Photo (simulated)',
+                completePhotoLabel: 'Upload Photo',
                 completeSubmitBtn: 'Submit',
                 collectionModalTitleAdd: 'Add Monthly Plan',
                 collectionModalTitleUpdate: 'Update Collection',
@@ -420,7 +419,6 @@
                 newPwdLabel: 'New Password',
                 confirmPwdLabel: 'Confirm New Password',
                 changePwdSaveBtn: 'Update Password',
-                // 其他
                 deleteBtn: 'Delete',
                 historyBtn: 'History',
                 collectionHistoryBtn: 'Collection History',
@@ -428,7 +426,6 @@
                 close: 'Close',
                 confirmDelete: 'Are you sure you want to delete this plan?',
                 confirmDeleteEmployee: 'Are you sure you want to delete employee {name}? Customers under this employee will be transferred to admin.',
-                // 计划列表
                 responsible: 'Responsible',
                 planned: 'Planned',
                 statusPending: 'Pending',
@@ -437,27 +434,26 @@
                 noNotes: 'No notes',
                 noPending: 'No pending plans',
                 noCompleted: 'No completed plans',
-                // 应收账款列表
                 receivableBalance: 'Receivable Balance',
                 thisMonthPlan: 'This Month Plan',
                 received: 'Received',
-                // 导入反馈
                 importSuccess: 'Import completed. Success: {success}, Failed: {failed}',
                 importFailDetail: 'Failure details:\n{details}',
-                // 员工管理
                 cannotDeleteSelf: 'You cannot delete yourself.',
-                // 时间范围
-                thisMonth: 'This Month',
-                lastMonth: 'Last Month',
-                last3Months: 'Last 3 Months',
+                photoUploadFailed: 'Photo upload failed: ',
+                photoCompressFailed: 'Photo compression failed: ',
+                photoExpired: 'Photo expired',
+                customerNameExists: 'Customer name already exists',
+                noRecords: 'No records',
             },
             zh: {
-                loginTitle: '销售团队登录',
+                loginTitle: '华亿汽配',
                 selectAccountLabel: '选择账号',
                 passwordLabel: '密码',
                 loginBtnText: '登录',
                 loginHint: '初始密码统一为123456，登录后可修改。',
-                appTitle: '坦桑销售管理',
+                appTitle: '华亿销售团队欢迎你',
+                slogan: '✨ 每一次拜访，都是成功的积累！',
                 changePwdBtnText: '修改密码',
                 logoutBtnText: '退出',
                 tabDashboard: '首页看板',
@@ -469,6 +465,7 @@
                 rangeThisMonth: '本月',
                 rangeLastMonth: '上月',
                 rangeLast3Months: '最近3个月',
+                rangeLast6Months: '最近6个月',
                 rankVisitsTitle: '拜访客户数（已完成）',
                 rankPendingTitle: '未完成计划数',
                 rankPlanTitle: '计划收款金额',
@@ -479,6 +476,7 @@
                 showMoreText: '展开更多',
                 addCustomerBtnText: '新增客户',
                 refreshBtnText: '刷新',
+                receivableSlogan: '⭐ 及时收款，让业绩更出色！',
                 importExcelTitle: '批量导入客户 (Excel)',
                 downloadTemplateText: '下载Excel模板',
                 uploadBtnText: '上传并导入',
@@ -494,7 +492,7 @@
                 planSaveBtn: '保存计划',
                 completeTitle: '完成拜访',
                 completeEvalLabel: '备注（拜访评价/反馈）',
-                completePhotoLabel: '上传照片 (模拟)',
+                completePhotoLabel: '上传照片',
                 completeSubmitBtn: '提交完成',
                 collectionModalTitleAdd: '添加月度计划',
                 collectionModalTitleUpdate: '更新收款',
@@ -540,13 +538,14 @@
                 importSuccess: '导入完成。成功: {success} 条，失败: {failed} 条。',
                 importFailDetail: '失败详情：\n{details}',
                 cannotDeleteSelf: '不能删除自己。',
-                thisMonth: '本月',
-                lastMonth: '上月',
-                last3Months: '最近3个月',
+                photoUploadFailed: '照片上传失败：',
+                photoCompressFailed: '照片压缩失败：',
+                photoExpired: '图片已过期',
+                customerNameExists: '客户名称已存在',
+                noRecords: '暂无记录',
             }
         };
 
-        // 语言切换函数
         function setLanguage(lang) {
             currentLang = lang;
             document.getElementById('langToggle').innerText = lang === 'en' ? '中文' : 'English';
@@ -557,6 +556,7 @@
             document.getElementById('loginBtnText').innerText = t.loginBtnText;
             document.getElementById('loginHint').innerText = t.loginHint;
             document.getElementById('appTitle').innerText = t.appTitle;
+            document.getElementById('slogan').innerText = t.slogan;
             document.getElementById('changePwdBtnText').innerText = t.changePwdBtnText;
             document.getElementById('logoutBtnText').innerText = t.logoutBtnText;
             document.getElementById('tabDashboard').innerText = t.tabDashboard;
@@ -569,6 +569,7 @@
             document.getElementById('rangeThisMonth').innerText = t.thisMonth;
             document.getElementById('rangeLastMonth').innerText = t.lastMonth;
             document.getElementById('rangeLast3Months').innerText = t.last3Months;
+            document.getElementById('rangeLast6Months').innerText = t.last6Months;
             document.getElementById('rankVisitsTitle').innerText = t.rankVisitsTitle;
             document.getElementById('rankPendingTitle').innerText = t.rankPendingTitle;
             document.getElementById('rankPlanTitle').innerText = t.rankPlanTitle;
@@ -579,6 +580,7 @@
             document.getElementById('showMoreText').innerText = t.showMoreText;
             document.getElementById('addCustomerBtnText').innerText = t.addCustomerBtnText;
             document.getElementById('refreshBtnText').innerText = t.refreshBtnText;
+            document.getElementById('receivableSlogan').innerText = t.receivableSlogan;
             document.getElementById('importExcelTitle').innerText = t.importExcelTitle;
             document.getElementById('downloadTemplateText').innerText = t.downloadTemplateText;
             document.getElementById('uploadBtnText').innerText = t.uploadBtnText;
@@ -597,13 +599,32 @@
             document.getElementById('completeEvalLabel').innerText = t.completeEvalLabel;
             document.getElementById('completePhotoLabel').innerText = t.completePhotoLabel;
             document.getElementById('completeSubmitBtn').innerText = t.completeSubmitBtn;
-            // 其他模态框类似，为避免代码过长，只更新了几个关键标签，实际使用中需要全部更新，但当前已覆盖大部分
-            // 动态内容将在渲染时根据语言重新生成，因此静态标签已足够。
+            document.getElementById('collectionModalTitle').innerText = t.collectionModalTitleAdd; // 初始为添加，打开时会动态改
+            document.getElementById('collectionPlanLabel').innerText = t.collectionPlanLabel;
+            document.getElementById('collectionActualLabel').innerText = t.collectionActualLabel;
+            document.getElementById('collectionHint').innerText = t.collectionHintAdd;
+            document.getElementById('collectionSaveBtn').innerText = t.collectionSaveBtn;
+            document.getElementById('addCustomerTitle').innerText = t.addCustomerTitle;
+            document.getElementById('addCustomerNameLabel').innerText = t.addCustomerNameLabel;
+            document.getElementById('addCustomerSalesLabel').innerText = t.addCustomerSalesLabel;
+            document.getElementById('addCustomerReceivableLabel').innerText = t.addCustomerReceivableLabel;
+            document.getElementById('addCustomerSaveBtn').innerText = t.addCustomerSaveBtn;
+            document.getElementById('transferTitle').innerText = t.transferTitle;
+            document.getElementById('transferSalesLabel').innerText = t.transferSalesLabel;
+            document.getElementById('transferConfirmBtn').innerText = t.transferConfirmBtn;
+            document.getElementById('addEmployeeTitle').innerText = t.addEmployeeTitle;
+            document.getElementById('empUsernameLabel').innerText = t.empUsernameLabel;
+            document.getElementById('empDefaultPwd').innerText = t.empDefaultPwd;
+            document.getElementById('addEmployeeSaveBtn').innerText = t.addEmployeeSaveBtn;
+            document.getElementById('changePwdTitle').innerText = t.changePwdTitle;
+            document.getElementById('newPwdLabel').innerText = t.newPwdLabel;
+            document.getElementById('confirmPwdLabel').innerText = t.confirmPwdLabel;
+            document.getElementById('changePwdSaveBtn').innerText = t.changePwdSaveBtn;
+            document.getElementById('collectionHistoryTitle').innerText = t.collectionHistoryBtn;
         }
 
         document.getElementById('langToggle').addEventListener('click', () => {
             setLanguage(currentLang === 'en' ? 'zh' : 'en');
-            // 重新渲染所有动态内容
             if (currentUser) {
                 renderDashboard();
                 renderPlanLists();
@@ -618,10 +639,10 @@
         let allCustomers = [];
         let allVisits = [];
         let allCollections = [];
-        let allCollectionHistory = []; // 模拟历史记录
+        let allCollectionHistory = [];
 
         let completedDisplayCount = 5;
-        let currentTimeRange = 'thisMonth'; // thisMonth, lastMonth, last3Months
+        let currentTimeRange = 'thisMonth';
 
         // DOM 元素
         const loginSection = document.getElementById('loginSection');
@@ -642,19 +663,16 @@
             employees: document.getElementById('employeesTab')
         };
 
-        // 工具函数：获取月份起始日期 (yyyy-mm-01)
+        // 工具函数
         function getMonthStart(date = new Date()) {
             const d = new Date(date);
             d.setDate(1);
             d.setHours(0,0,0,0);
             return d;
         }
-
         function formatMonthStart(date) {
             return date.toISOString().split('T')[0].slice(0,7) + '-01';
         }
-
-        // 获取当前选择的起始和结束日期
         function getDateRange() {
             const now = new Date();
             let start, end;
@@ -667,13 +685,66 @@
             } else if (currentTimeRange === 'last3Months') {
                 start = getMonthStart(new Date(now.getFullYear(), now.getMonth()-2, 1));
                 end = new Date(now.getFullYear(), now.getMonth()+1, 0, 23,59,59);
+            } else if (currentTimeRange === 'last6Months') {
+                start = getMonthStart(new Date(now.getFullYear(), now.getMonth()-5, 1));
+                end = new Date(now.getFullYear(), now.getMonth()+1, 0, 23,59,59);
             }
             return { start, end };
         }
-
-        // 金额格式化
         function formatMoney(amount) {
             return '$' + Number(amount).toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,');
+        }
+
+        // 压缩图片
+        async function compressImage(file, maxWidth = 1200, maxHeight = 1200, quality = 0.7) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.src = e.target.result;
+                    img.onload = () => {
+                        let width = img.width, height = img.height;
+                        if (width > height) {
+                            if (width > maxWidth) {
+                                height *= maxWidth / width;
+                                width = maxWidth;
+                            }
+                        } else {
+                            if (height > maxHeight) {
+                                width *= maxHeight / height;
+                                height = maxHeight;
+                            }
+                        }
+                        const canvas = document.createElement('canvas');
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+                        let q = quality;
+                        const maxSize = 500 * 1024;
+                        let blob;
+                        do {
+                            canvas.toBlob((b) => { blob = b; }, 'image/jpeg', q);
+                            if (!blob) break;
+                            if (blob.size <= maxSize || q < 0.2) break;
+                            q -= 0.1;
+                        } while (true);
+                        if (blob) {
+                            const newFileName = file.name.replace(/\.[^/.]+$/, '') + '_compressed.jpg';
+                            const compressedFile = new File([blob], newFileName, {
+                                type: 'image/jpeg',
+                                lastModified: Date.now()
+                            });
+                            resolve(compressedFile);
+                        } else {
+                            reject(new Error(i18n[currentLang].photoCompressFailed));
+                        }
+                    };
+                    img.onerror = reject;
+                };
+                reader.onerror = reject;
+            });
         }
 
         // 恢复会话
@@ -761,30 +832,21 @@
         }
 
         async function loadAllData() {
-            // 客户
             let custQuery = supabaseClient.from('customers').select('*');
             if (currentUser.role !== 'admin') custQuery = custQuery.eq('sales_id', currentUser.id);
             const { data: customers } = await custQuery;
             allCustomers = customers || [];
 
-            // 拜访
             let visitQuery = supabaseClient.from('visits').select('*, customers(name)');
             if (currentUser.role !== 'admin') visitQuery = visitQuery.eq('sales_id', currentUser.id);
             const { data: visits } = await visitQuery;
             allVisits = visits || [];
 
-            // 收款计划
             let colQuery = supabaseClient.from('collections').select('*, customers(name)');
             if (currentUser.role !== 'admin') colQuery = colQuery.eq('sales_id', currentUser.id);
             const { data: cols } = await colQuery;
             allCollections = cols || [];
 
-            // 收款历史 (模拟，实际应查询 collection_history 表)
-            // 这里简化，直接从本地存储读取，实际需从数据库加载
-            // 为了简化，我们在每次更新收款时插入 history 记录到 local array，但刷新会丢失
-            // 因此需要数据库表。在此代码中，我们不会实际实现历史记录存储，但提供界面。
-            // 为演示，我们使用一个简单的本地数组模拟，刷新后丢失。建议您创建 collection_history 表并插入。
-            // 这里为了完整，假设 allCollectionHistory 从数据库加载
             const { data: hist } = await supabaseClient.from('collection_history').select('*');
             allCollectionHistory = hist || [];
 
@@ -794,7 +856,6 @@
             if (currentUser.role === 'admin') renderEmployeesList();
         }
 
-        // 绑定选项卡
         function bindTabs() {
             const tabs = document.querySelectorAll('.tab');
             tabs.forEach(tab => {
@@ -802,7 +863,6 @@
                 tab.addEventListener('click', tabClickHandler);
             });
         }
-
         function tabClickHandler(e) {
             const target = e.currentTarget.dataset.tab;
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -813,7 +873,6 @@
         }
         bindTabs();
 
-        // 时间范围切换
         document.getElementById('timeRangeSelect').addEventListener('change', (e) => {
             currentTimeRange = e.target.value;
             renderDashboard();
@@ -823,13 +882,10 @@
         function renderDashboard() {
             const salesUsers = allUsers.filter(u => u.role === 'sales');
             const { start, end } = getDateRange();
-
             const visitCounts = {}, pendingCounts = {}, planAmount = {}, actualAmount = {};
             salesUsers.forEach(u => {
                 visitCounts[u.id] = 0; pendingCounts[u.id] = 0; planAmount[u.id] = 0; actualAmount[u.id] = 0;
             });
-
-            // 统计拜访
             allVisits.forEach(v => {
                 const d = new Date(v.plan_date);
                 if (d >= start && d <= end) {
@@ -837,8 +893,6 @@
                     else if (v.status === 'pending') pendingCounts[v.sales_id] = (pendingCounts[v.sales_id] || 0) + 1;
                 }
             });
-
-            // 统计收款
             allCollections.forEach(c => {
                 const d = new Date(c.month_start);
                 if (d >= start && d <= end) {
@@ -847,7 +901,6 @@
                     actualAmount[salesId] = (actualAmount[salesId] || 0) + (Number(c.actual_amount) || 0);
                 }
             });
-
             const visitRank = salesUsers.map(u => ({ username: u.username, value: visitCounts[u.id] || 0 })).sort((a,b) => b.value - a.value);
             const pendingRank = salesUsers.map(u => ({ username: u.username, value: pendingCounts[u.id] || 0 })).sort((a,b) => b.value - a.value);
             const planRank = salesUsers.map(u => ({ username: u.username, value: planAmount[u.id] || 0 })).sort((a,b) => b.value - a.value);
@@ -857,7 +910,6 @@
                 const pct = plan > 0 ? ((actual / plan) * 100).toFixed(0) : 0;
                 return { username: u.username, value: pct };
             }).sort((a,b) => b.value - a.value);
-
             document.getElementById('rankVisits').innerHTML = visitRank.map(r => `<div class="rank-item"><span>${r.username}</span><strong>${r.value}</strong></div>`).join('');
             document.getElementById('rankPending').innerHTML = pendingRank.map(r => `<div class="rank-item"><span>${r.username}</span><strong>${r.value}</strong></div>`).join('');
             document.getElementById('rankPlan').innerHTML = planRank.map(r => `<div class="rank-item"><span>${r.username}</span><strong>${formatMoney(r.value)}</strong></div>`).join('');
@@ -875,11 +927,9 @@
                 });
             const completedVisits = allVisits.filter(v => v.status === 'completed')
                 .sort((a,b) => new Date(b.plan_date) - new Date(a.plan_date));
-
             renderPendingList(pendingVisits);
             renderCompletedList(completedVisits);
         }
-
         function renderPendingList(visits) {
             const container = document.getElementById('pendingPlansContainer');
             const t = i18n[currentLang];
@@ -915,7 +965,6 @@
             }).join('');
             if (visits.length > 10) container.innerHTML += `<p class="text-muted">${t.showMoreText}</p>`;
         }
-
         function renderCompletedList(visits) {
             const container = document.getElementById('completedPlansContainer');
             const showMoreBtn = document.getElementById('showMoreCompletedBtn');
@@ -957,19 +1006,16 @@
                 showMoreBtn.style.display = 'none';
             }
         }
-
         document.getElementById('showMoreCompletedBtn').addEventListener('click', () => {
             completedDisplayCount += 5;
             renderPlanLists();
         });
-
         window.deleteVisit = async function(visitId) {
             if (!confirm(i18n[currentLang].confirmDelete)) return;
             const { error } = await supabaseClient.from('visits').delete().eq('id', visitId);
             if (error) alert(error.message);
             else await loadAllData();
         };
-
         window.openCompleteModal = function(visitId) {
             const visit = allVisits.find(v => v.id === visitId);
             document.getElementById('completeVisitId').value = visitId;
@@ -977,7 +1023,6 @@
             document.getElementById('completePhoto').value = '';
             document.getElementById('completeVisitModal').style.display = 'flex';
         };
-
         document.getElementById('completeForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const visitId = document.getElementById('completeVisitId').value;
@@ -985,11 +1030,22 @@
             const photoFile = document.getElementById('completePhoto').files[0];
             let photoUrl = '';
             if (photoFile) {
-                photoUrl = await new Promise(res => {
-                    const reader = new FileReader();
-                    reader.onload = () => res(reader.result);
-                    reader.readAsDataURL(photoFile);
-                });
+                try {
+                    const compressedFile = await compressImage(photoFile);
+                    const fileExt = 'jpg';
+                    const fileName = `visit_${visitId}_${Date.now()}.${fileExt}`;
+                    const { data, error: uploadError } = await supabaseClient.storage
+                        .from('visit-photos')
+                        .upload(fileName, compressedFile);
+                    if (uploadError) throw uploadError;
+                    const { data: { publicUrl } } = supabaseClient.storage
+                        .from('visit-photos')
+                        .getPublicUrl(fileName);
+                    photoUrl = publicUrl;
+                } catch (err) {
+                    alert(i18n[currentLang].photoUploadFailed + err.message);
+                    return;
+                }
             }
             const { error } = await supabaseClient.from('visits').update({
                 status: 'completed',
@@ -1004,7 +1060,6 @@
                 completedDisplayCount = 5;
             }
         });
-
         document.getElementById('addPlanBtn').addEventListener('click', openPlanModal);
         function openPlanModal() {
             const select = document.getElementById('planCustomerId');
@@ -1015,7 +1070,6 @@
             document.getElementById('planEvaluation').value = '';
             document.getElementById('planModal').style.display = 'flex';
         }
-
         document.getElementById('planForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const customerId = document.getElementById('planCustomerId').value;
@@ -1044,21 +1098,18 @@
             const container = document.getElementById('receivableList');
             const t = i18n[currentLang];
             if (!allCustomers.length) {
-                container.innerHTML = `<p class="text-muted">${t.noCustomers || 'No customers'}</p>`;
+                container.innerHTML = `<p class="text-muted">${t.noRecords}</p>`;
                 return;
             }
-
             const monthStart = formatMonthStart(new Date());
             const customersWithData = allCustomers.map(c => {
                 const col = allCollections.find(col => col.customer_id === c.id && col.month_start === monthStart);
                 const plan = col ? col.plan_amount : 0;
                 const actual = col ? col.actual_amount : 0;
-                const completion = plan > 0 ? actual / plan : -1; // -1 表示无计划
+                const completion = plan > 0 ? actual / plan : -1;
                 const sales = allUsers.find(u => u.id === c.sales_id);
                 return { ...c, plan, actual, completion, salesName: sales ? sales.username : '?' };
             });
-
-            // 排序：完成度升序（-1 放最后），同完成度按名称字母
             customersWithData.sort((a, b) => {
                 if (a.completion === -1 && b.completion === -1) return a.name.localeCompare(b.name);
                 if (a.completion === -1) return 1;
@@ -1066,7 +1117,6 @@
                 if (a.completion !== b.completion) return a.completion - b.completion;
                 return a.name.localeCompare(b.name);
             });
-
             container.innerHTML = customersWithData.map(c => {
                 const hasPlan = c.completion !== -1;
                 const buttonText = hasPlan ? t.collectionModalTitleUpdate : t.collectionModalTitleAdd;
@@ -1086,7 +1136,6 @@
                 `;
             }).join('');
         }
-
         window.openCollectionModal = function(customerId, currentPlan, currentActual, hasPlan, colId) {
             document.getElementById('collectionModalTitle').innerText = hasPlan ? i18n[currentLang].collectionModalTitleUpdate : i18n[currentLang].collectionModalTitleAdd;
             document.getElementById('collectionPlan').value = currentPlan;
@@ -1097,7 +1146,6 @@
             document.getElementById('collectionHint').innerText = hasPlan ? i18n[currentLang].collectionHintUpdate : i18n[currentLang].collectionHintAdd;
             document.getElementById('collectionModal').style.display = 'flex';
         };
-
         document.getElementById('collectionForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const customerId = document.getElementById('collectionCustomerId').value;
@@ -1108,16 +1156,13 @@
             if (!customer) { alert('Customer not found'); return; }
             const salesId = customer.sales_id;
             const monthStart = formatMonthStart(new Date());
-
             if (existsId) {
-                // 更新实收，并记录历史
                 const { data: existing } = await supabaseClient.from('collections').select('actual_amount').eq('id', existsId).single();
                 if (existing) {
                     const newActual = (existing.actual_amount || 0) + actualIncrement;
                     const { error } = await supabaseClient.from('collections').update({ actual_amount: newActual }).eq('id', existsId);
                     if (error) alert(error.message);
                     else {
-                        // 插入历史
                         await supabaseClient.from('collection_history').insert({
                             customer_id: customerId,
                             collection_id: existsId,
@@ -1127,7 +1172,6 @@
                     }
                 }
             } else {
-                // 插入新计划
                 const { data: newCol, error } = await supabaseClient.from('collections').insert({
                     customer_id: customerId,
                     sales_id: salesId,
@@ -1148,23 +1192,20 @@
             document.getElementById('collectionModal').style.display = 'none';
             await loadAllData();
         });
-
-        // 显示收款历史
         window.showCollectionHistory = async function(customerId) {
             const { data } = await supabaseClient.from('collection_history')
                 .select('*')
                 .eq('customer_id', customerId)
                 .order('record_date', { ascending: false });
             const list = document.getElementById('collectionHistoryList');
+            const t = i18n[currentLang];
             if (!data || data.length === 0) {
-                list.innerHTML = '<p class="text-muted">No history</p>';
+                list.innerHTML = '<p class="text-muted">' + t.noRecords + '</p>';
             } else {
                 list.innerHTML = data.map(h => `<div class="history-item">${h.record_date}: ${formatMoney(h.amount)}</div>`).join('');
             }
             document.getElementById('collectionHistoryModal').style.display = 'flex';
         };
-
-        // 新增客户
         document.getElementById('addCustomerBtn').addEventListener('click', () => {
             const select = document.getElementById('newCustomerSales');
             select.innerHTML = allUsers.filter(u => u.role === 'sales').map(u => `<option value="${u.id}">${u.username}</option>`).join('');
@@ -1178,9 +1219,10 @@
             const name = document.getElementById('newCustomerName').value.trim();
             const salesId = document.getElementById('newCustomerSales').value;
             const receivable = parseFloat(document.getElementById('newCustomerReceivable').value) || 0;
-            if (!name) return alert('Name required');
+            const t = i18n[currentLang];
+            if (!name) return alert(t.customerNameExists);
             if (allCustomers.some(c => c.name === name)) {
-                alert('Customer name already exists');
+                alert(t.customerNameExists);
                 return;
             }
             const { error } = await supabaseClient.from('customers').insert({ name, sales_id: salesId, receivable });
@@ -1190,8 +1232,6 @@
                 await loadAllData();
             }
         });
-
-        // 转移客户
         window.openTransferModal = function(customerId) {
             document.getElementById('transferCustomerId').value = customerId;
             const select = document.getElementById('transferSalesId');
@@ -1227,7 +1267,6 @@
                 </tr>
             `).join('');
         }
-
         window.deleteEmployee = async function(userId, username) {
             const t = i18n[currentLang];
             if (!confirm(t.confirmDeleteEmployee.replace('{name}', username))) return;
@@ -1236,25 +1275,12 @@
             if (!adminUser) { alert('Admin not found'); return; }
             const { error: updateErr } = await supabaseClient.from('customers').update({ sales_id: adminUser.id }).eq('sales_id', userId);
             if (updateErr) { alert('Transfer customers failed: ' + updateErr.message); return; }
-
-            // 删除 Auth 用户（如果有服务角色密钥）
-            try {
-                if (typeof SUPABASE_SERVICE_ROLE_KEY !== 'undefined' && SUPABASE_SERVICE_ROLE_KEY) {
-                    const adminAuthClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
-                    const email = username + '@local.host';
-                    const { data: userList } = await adminAuthClient.auth.admin.listUsers();
-                    const target = userList.users.find(u => u.email === email);
-                    if (target) await adminAuthClient.auth.admin.deleteUser(target.id);
-                }
-            } catch (err) { console.warn('Auth delete failed', err); }
-
             const { error: delErr } = await supabaseClient.from('users').delete().eq('id', userId);
             if (delErr) { alert('Delete employee failed: ' + delErr.message); return; }
             await loadUsers();
             if (currentUser.role === 'admin') renderEmployeesList();
             await loadAllData();
         };
-
         document.getElementById('addEmployeeBtn').addEventListener('click', () => {
             document.getElementById('addEmployeeModal').style.display = 'flex';
         });
@@ -1264,8 +1290,9 @@
         document.getElementById('addEmployeeForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const username = document.getElementById('newEmployeeUsername').value.trim();
-            if (!/^[A-Za-z]+$/.test(username)) { alert('Username letters only'); return; }
-            if (allUsers.some(u => u.username === username)) { alert('Username exists'); return; }
+            const t = i18n[currentLang];
+            if (!/^[A-Za-z]+$/.test(username)) { alert(t.empUsernameLabel); return; }
+            if (allUsers.some(u => u.username === username)) { alert(t.customerNameExists); return; }
             const email = username + '@local.host';
             const password = '123456';
             try {
@@ -1273,14 +1300,14 @@
                 if (signUpErr) throw signUpErr;
                 const { error: insertErr } = await supabaseClient.from('users').insert({ username, role: 'sales' });
                 if (insertErr) throw insertErr;
-                alert('Employee created, default password 123456');
+                alert(t.empDefaultPwd);
                 document.getElementById('addEmployeeModal').style.display = 'none';
                 await loadUsers();
                 if (currentUser.role === 'admin') renderEmployeesList();
-            } catch (err) { alert('Creation failed: ' + err.message); }
+            } catch (err) { alert(t.photoUploadFailed + err.message); }
         });
 
-        // ========== Excel导入 ==========
+        // ========== Excel导入（修复用户匹配） ==========
         document.getElementById('downloadExcelTemplate').addEventListener('click', () => {
             const data = [
                 ['客户名称', '业务员用户名', '应收金额', '本月计划金额'],
@@ -1291,25 +1318,25 @@
             XLSX.utils.book_append_sheet(wb, ws, '模板');
             XLSX.writeFile(wb, '客户导入模板.xlsx');
         });
-
         document.getElementById('uploadExcelBtn').addEventListener('click', async () => {
             const fileInput = document.getElementById('excelFileInput');
             const file = fileInput.files[0];
-            if (!file) { alert('请选择文件'); return; }
+            const t = i18n[currentLang];
+            if (!file) { alert(t.uploadBtnText); return; }
             const reader = new FileReader();
             reader.onload = async (e) => {
                 const data = new Uint8Array(e.target.result);
                 const wb = XLSX.read(data, { type: 'array' });
                 const sheet = wb.SheetNames[0];
                 const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheet], { header: 1, defval: '' });
-                if (rows.length < 2) { alert('文件至少需要标题行和一行数据'); return; }
+                if (rows.length < 2) { alert(t.importFailDetail); return; }
                 const header = rows[0].map(s => String(s).trim());
                 const nameIdx = header.indexOf('客户名称');
                 const salesIdx = header.indexOf('业务员用户名');
                 const receivableIdx = header.indexOf('应收金额');
                 const planIdx = header.indexOf('本月计划金额');
                 if (nameIdx === -1 || salesIdx === -1 || receivableIdx === -1 || planIdx === -1) {
-                    alert('标题必须包含：客户名称, 业务员用户名, 应收金额, 本月计划金额');
+                    alert(t.importFailDetail);
                     return;
                 }
                 const success = [], failed = [];
@@ -1323,19 +1350,20 @@
                     if (!name) { failed.push(`行 ${i+1}: 客户名称为空`); continue; }
                     if (!salesUsername) { failed.push(`行 ${i+1}: 业务员用户名为空`); continue; }
 
-                    const salesUser = allUsers.find(u => u.username === salesUsername && u.role === 'sales');
-                    if (!salesUser) { failed.push(`行 ${i+1}: 业务员 ${salesUsername} 不存在`); continue; }
+                    const lowerUsername = salesUsername.trim().toLowerCase();
+                    const salesUser = allUsers.find(u => u.username.toLowerCase().trim() === lowerUsername);
+                    if (!salesUser) {
+                        failed.push(`行 ${i+1}: 业务员 ${salesUsername} 不存在`);
+                        continue;
+                    }
 
-                    // 检查客户是否存在
                     const existing = allCustomers.find(c => c.name === name);
                     if (existing) {
-                        // 更新客户信息
                         const { error: updErr } = await supabaseClient.from('customers').update({
                             sales_id: salesUser.id,
                             receivable
                         }).eq('id', existing.id);
                         if (updErr) { failed.push(`行 ${i+1}: 更新客户失败 ${updErr.message}`); continue; }
-                        // 更新本月计划
                         const monthStart = formatMonthStart(new Date());
                         const col = allCollections.find(c => c.customer_id === existing.id && c.month_start === monthStart);
                         if (col) {
@@ -1354,14 +1382,12 @@
                             else success.push(name);
                         }
                     } else {
-                        // 插入新客户
                         const { data: newCust, error: custErr } = await supabaseClient.from('customers').insert({
                             name,
                             sales_id: salesUser.id,
                             receivable
                         }).select().single();
                         if (custErr) { failed.push(`行 ${i+1}: 插入客户失败 ${custErr.message}`); continue; }
-                        // 插入本月计划
                         const monthStart = formatMonthStart(new Date());
                         const { error: colErr } = await supabaseClient.from('collections').insert({
                             customer_id: newCust.id,
@@ -1374,7 +1400,6 @@
                         else success.push(name);
                     }
                 }
-                const t = i18n[currentLang];
                 const msg = t.importSuccess.replace('{success}', success.length).replace('{failed}', failed.length) + '\n' +
                            t.importFailDetail.replace('{details}', failed.join('\n'));
                 document.getElementById('excelImportMessage').innerText = msg;
@@ -1384,14 +1409,16 @@
             reader.readAsArrayBuffer(file);
         });
 
-        // JSON导入（保持原有）
+        // JSON导入（同样修复）
         document.getElementById('importCustomersBtn').addEventListener('click', async () => {
             const raw = document.getElementById('importCustomerData').value;
+            const t = i18n[currentLang];
             try {
                 const list = JSON.parse(raw);
                 const errors = [];
                 for (let item of list) {
-                    const salesUser = allUsers.find(u => u.username === item.sales);
+                    const lowerSales = item.sales.trim().toLowerCase();
+                    const salesUser = allUsers.find(u => u.username.toLowerCase().trim() === lowerSales);
                     if (!salesUser) { errors.push(`业务员 ${item.sales} 不存在`); continue; }
                     const existing = allCustomers.find(c => c.name === item.name);
                     if (existing) {
@@ -1406,31 +1433,30 @@
                         await supabaseClient.from('collections').insert({ customer_id: newCust.id, sales_id: salesUser.id, month_start: monthStart, plan_amount: item.plan_amount || 0, actual_amount: 0 });
                     }
                 }
-                document.getElementById('importMessage').innerText = '导入成功';
+                document.getElementById('importMessage').innerText = t.importSuccess.replace('{success}', list.length).replace('{failed}', errors.length);
                 await loadAllData();
             } catch (err) { alert('JSON格式错误：' + err); }
         });
 
-        // 客户拜访历史
+        // 客户历史
         window.showHistory = async function(customerId) {
             const customer = allCustomers.find(c => c.id === customerId);
             document.getElementById('historyCustomerName').innerText = customer ? customer.name : 'History';
             const { data } = await supabaseClient.from('visits').select('*').eq('customer_id', customerId).order('plan_date', { ascending: false });
             const historyList = document.getElementById('historyList');
-            if (!data || data.length === 0) historyList.innerHTML = '<p class="text-muted">No records</p>';
+            const t = i18n[currentLang];
+            if (!data || data.length === 0) historyList.innerHTML = '<p class="text-muted">' + t.noRecords + '</p>';
             else {
                 historyList.innerHTML = data.map(v => `
                     <div class="history-item">
                         <div><strong>${v.plan_date}</strong> ${v.status === 'completed' ? '✅ Completed' : '⏳ Pending'}</div>
-                        ${v.evaluation ? `<p>Notes: ${v.evaluation}</p>` : ''}
-                        ${v.photo_url ? '<div class="photo-placeholder"><i class="fas fa-image"></i> Photo</div>' : ''}
+                        ${v.evaluation ? `<p>${t.notes}: ${v.evaluation}</p>` : ''}
+                        ${v.photo_url ? `<img src="${v.photo_url}" style="max-width:100px; max-height:100px;" onerror="this.onerror=null; this.src=''; this.alt='${t.photoExpired}';" />` : ''}
                     </div>
                 `).join('');
             }
             document.getElementById('historyModal').style.display = 'flex';
         };
-
-        // 关闭模态框
         document.getElementById('closeHistory').addEventListener('click', () => {
             document.getElementById('historyModal').style.display = 'none';
         });
@@ -1467,20 +1493,19 @@
             e.preventDefault();
             const newPwd = document.getElementById('newPassword').value;
             const confirm = document.getElementById('confirmPassword').value;
-            if (newPwd !== confirm) { alert('Passwords do not match'); return; }
+            const t = i18n[currentLang];
+            if (newPwd !== confirm) { alert(t.confirmPwdLabel); return; }
             const { error } = await supabaseClient.auth.updateUser({ password: newPwd });
-            if (error) alert('Update failed: ' + error.message);
+            if (error) alert(t.photoUploadFailed + error.message);
             else {
-                alert('Password changed, please login again');
+                alert(t.changePwdTitle + ' success');
                 await supabaseClient.auth.signOut();
                 location.reload();
             }
         });
 
-        // 初始化语言
+        // 初始化
         setLanguage('en');
-
-        // 启动会话恢复
         restoreSession();
     })();
 </script>

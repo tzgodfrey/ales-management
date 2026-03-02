@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>销售团队管理 · 坦桑尼亚版（最终优化）</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        * { box-sizing: border-box; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 0; }
+        body { background: #f0f2f5; padding: 16px; }
+        .app-container { max-width: 1200px; margin: 0 auto; }
+        .login-card { background: white; border-radius: 24px; padding: 32px; max-width: 400px; margin: 60px auto; box-shadow: 0 8px 20px rgba(0,0,0,0.1); }
+        .login-card h2 { margin-bottom: 20px; color: #1e293b; }
+        .login-card select, .login-card input { width: 100%; padding: 12px 16px; margin: 8px 0 16px; border: 1px solid #ddd; border-radius: 40px; font-size: 16px; }
+        .login-card button { background: #0066cc; color: white; border: none; padding: 14px; width: 100%; border-radius: 40px; font-size: 16px; font-weight: 600; cursor: pointer; }
+        .login-card button:hover { background: #0052a3; }
+        .error { color: #dc2626; font-size: 14px; margin-top: 8px; }
+        .main-interface { display: none; }
+        .header { background: white; border-radius: 30px; padding: 16px 24px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        .user-badge { background: #e6f0ff; padding: 8px 18px; border-radius: 40px; font-weight: 500; color: #0066cc; }
+        .logout-btn { background: none; border: 1px solid #ddd; padding: 8px 18px; border-radius: 40px; cursor: pointer; }
+        .tabs { display: flex; gap: 10px; margin-bottom: 24px; flex-wrap: wrap; }
+        .tab { background: white; padding: 10px 22px; border-radius: 40px; cursor: pointer; font-weight: 500; border: 1px solid #e2e8f0; }
+        .tab.active { background: #0066cc; color: white; border-color: #0066cc; }
+        .tab-content { background: white; border-radius: 30px; padding: 24px; box-shadow: 0 2px 12px rgba(0,0,0,0.04); }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .stats-card { background: #f8fafc; border-radius: 20px; padding: 18px; }
+        .rank-item { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #edf2f7; }
+        .plan-section { margin-top: 24px; }
+        .plan-section h4 { margin-bottom: 12px; color: #1e293b; }
+        .plan-list-container { max-height: 400px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 16px; padding: 8px; background: #f8fafc; }
+        .plan-item { background: white; border-radius: 12px; padding: 12px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: flex-start; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .plan-info { flex: 2; }
+        .plan-row1 { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 6px; }
+        .plan-row2 { color: #475569; font-size: 14px; margin-left: 4px; }
+        .badge { background: #e2e8f0; padding: 4px 10px; border-radius: 30px; font-size: 13px; white-space: nowrap; }
+        .badge-pending { background: #fef9c3; color: #854d0e; }
+        .badge-completed { background: #dcfce7; color: #166534; }
+        .btn { background: #0066cc; color: white; border: none; padding: 8px 18px; border-radius: 40px; cursor: pointer; font-size: 14px; }
+        .btn-outline { background: white; border: 1px solid #0066cc; color: #0066cc; }
+        .btn-small { padding: 5px 12px; font-size: 13px; }
+        .btn-danger { background: #dc2626; color: white; border: none; padding: 5px 12px; border-radius: 40px; cursor: pointer; font-size: 13px; }
+        .btn-link { background: none; border: none; color: #0066cc; cursor: pointer; font-size: 14px; text-decoration: underline; margin-top: 8px; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; z-index: 1000; }
+        .modal-content { background: white; border-radius: 32px; padding: 24px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto; }
+        .close { float: right; font-size: 24px; cursor: pointer; }
+        .history-item { padding: 12px; background: #f1f5f9; border-radius: 16px; margin-bottom: 8px; }
+        .photo-placeholder { width: 60px; height: 60px; background: #d1d5db; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: #4b5563; font-size: 12px; }
+        .customer-item { background: #f9f9fc; border-radius: 16px; padding: 16px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; }
+        .text-muted { color: #64748b; font-size: 0.9em; }
+        input:read-only { background: #f1f5f9; cursor: not-allowed; }
+        @media (max-width: 700px) { .grid-2 { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+<div class="app-container">
+    <!-- 登录界面 -->
+    <div id="loginSection" class="login-card">
+        <h2><i class="fas fa-users" style="margin-right: 10px;"></i>销售团队登录</h2>
+        <div>
+            <label>选择账号</label>
+            <select id="usernameSelect">
+                <option value="ernest">ernest (业务员)</option>
+                <option value="walter">walter (业务员)</option>
+                <option value="mussa">mussa (业务员)</option>
+                <option value="king">king (业务员)</option>
+                <option value="admin">admin (主账号)</option>
+            </select>
+            <label>密码</label>
+            <input type="password" id="passwordInput" placeholder="输入密码" value="123456">
+            <button id="loginBtn"><i class="fas fa-sign-in-alt"></i> 登录</button>
+            <div id="loginError" class="error"></div>
+        </div>
+        <p style="font-size:13px; color:#777; margin-top:20px;">初始密码统一为123456，登录后可修改。</p>
+    </div>
+
+    <!-- 主界面 (登录后显示) -->
+    <div id="mainInterface" class="main-interface">
+        <div class="header">
+            <div><strong><i class="fas fa-chart-line"></i> 坦桑销售管理</strong></div>
+            <div class="user-badge" id="currentUserDisplay"></div>
+            <button class="logout-btn" id="logoutBtn"><i class="fas fa-sign-out-alt"></i> 退出</button>
+        </div>
+
+        <!-- 选项卡 -->
+        <div class="tabs">
+            <div class="tab active" data-tab="dashboard">首页看板</div>
+            <div class="tab" data-tab="plans">拜访计划</div>
+            <div class="tab" data-tab="receivable">应收账款</div>
+            <div class="tab" data-tab="import">导入数据</div>
+        </div>
+
+        <!-- 首页看板 -->
+        <div id="dashboardTab" class="tab-content">
+            <h3>本月排名 <i class="fas fa-trophy" style="color: #fbbf24;"></i></h3>
+            <div class="grid-2">
+                <div class="stats-card">
+                    <h4>拜访客户数（已完成）</h4>
+                    <div id="rankVisits"></div>
+                </div>
+                <div class="stats-card">
+                    <h4>未完成计划数</h4>
+                    <div id="rankPending"></div>
+                </div>
+                <div class="stats-card">
+                    <h4>计划收款金额</h4>
+                    <div id="rankPlan"></div>
+                </div>
+                <div class="stats-card">
+                    <h4>收款完成度</h4>
+                    <div id="rankCompletion"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 拜访计划 -->
+        <div id="plansTab" class="tab-content" style="display: none;">
+            <div style="margin-bottom: 20px;">
+                <button class="btn" id="addPlanBtn"><i class="fas fa-plus"></i> 新建拜访计划</button>
+            </div>
+            <!-- 未完成计划 -->
+            <div class="plan-section">
+                <h4>⏳ 未完成计划</h4>
+                <div id="pendingPlansContainer" class="plan-list-container"></div>
+            </div>
+            <!-- 已完成计划 -->
+            <div class="plan-section">
+                <h4>✅ 已完成计划</h4>
+                <div id="completedPlansContainer" class="plan-list-container" style="max-height: 300px;"></div>
+                <button id="showMoreCompletedBtn" class="btn-link" style="display: none;">展开更多</button>
+            </div>
+        </div>
+
+        <!-- 应收账款 -->
+        <div id="receivableTab" class="tab-content" style="display: none;">
+            <div style="margin-bottom: 20px;">
+                <button class="btn" id="refreshReceivableBtn"><i class="fas fa-sync-alt"></i> 刷新</button>
+            </div>
+            <div id="receivableList"></div>
+        </div>
+
+        <!-- 导入数据 -->
+        <div id="importTab" class="tab-content" style="display: none;">
+            <h4>导入客户资料 (JSON格式)</h4>
+            <textarea id="importCustomerData" rows="6" style="width:100%; border-radius:16px; padding:12px; border:1px solid #ccc;">[
+  {"name": "ABC公司", "sales": "ernest", "receivable": 5000},
+  {"name": "XYZ商店", "sales": "walter", "receivable": 3200}
+]</textarea>
+            <button class="btn" id="importCustomersBtn" style="margin-top:10px;">导入客户</button>
+            <div id="importMessage" style="margin-top:12px;"></div>
+        </div>
+    </div>
+</div>
+
+<!-- 模态框：新建拜访计划（含备注） -->
+<div id="planModal" class="modal">
+    <div class="modal-content">
+        <span class="close" id="closePlanModal">&times;</span>
+        <h3 id="planModalTitle">新建拜访计划</h3>
+        <form id="planForm">
+            <input type="hidden" id="planId">
+            <label>选择客户</label>
+            <select id="planCustomerId" required style="width:100%; padding:10px; border-radius:40px; border:1px solid #ccc; margin-bottom:15px;"></select>
+            <label>计划拜访日期</label>
+            <input type="date" id="planDate" required style="width:100%; padding:10px; border-radius:40px; border:1px solid #ccc; margin-bottom:15px;">
+            <label>备注（目的/初始评价）</label>
+            <textarea id="planEvaluation" rows="3" style="width:100%; border-radius:16px; padding:10px; border:1px solid #ccc; margin-bottom:15px;" placeholder="可填写拜访目的或初步想法"></textarea>
+            <button type="submit" class="btn" style="width:100%;">保存计划</button>
+        </form>
+    </div>
+</div>
+
+<!-- 模态框：完成拜访（编辑备注） -->
+<div id="completeVisitModal" class="modal">
+    <div class="modal-content">
+        <span class="close" id="closeCompleteModal">&times;</span>
+        <h3>完成拜访</h3>
+        <form id="completeForm">
+            <input type="hidden" id="completeVisitId">
+            <label>备注（拜访评价/反馈）</label>
+            <textarea id="completeEvaluation" rows="3" required style="width:100%; border-radius:16px; padding:10px; border:1px solid #ccc; margin-bottom:15px;" placeholder="填写拜访内容、结果、反馈等"></textarea>
+            <label>上传照片 (模拟)</label>
+            <input type="file" id="completePhoto" accept="image/*" style="margin:10px 0;">
+            <button type="submit" class="btn" style="width:100%;">提交完成</button>
+        </form>
+    </div>
+</div>
+
+<!-- 模态框：添加/更新收款（区分模式） -->
+<div id="collectionModal" class="modal">
+    <div class="modal-content">
+        <span class="close" id="closeCollectionModal">&times;</span>
+        <h3 id="collectionModalTitle">添加计划收款</h3>
+        <form id="collectionForm">
+            <input type="hidden" id="collectionCustomerId">
+            <input type="hidden" id="collectionExistsId"> <!-- 如果存在记录，存id -->
+            <div id="collectionPlanField">
+                <label>本周计划金额 (总额)</label>
+                <input type="number" id="collectionPlan" step="0.01" required style="width:100%; padding:10px; border-radius:40px; border:1px solid #ccc; margin-bottom:15px;">
+            </div>
+            <label>本次实收金额 (本次增加的金额)</label>
+            <input type="number" id="collectionActual" step="0.01" value="0" required style="width:100%; padding:10px; border-radius:40px; border:1px solid #ccc; margin-bottom:15px;">
+            <p class="text-muted" id="collectionHint">提示：计划金额将保存为本月计划，实收金额累加到本周总额。</p>
+            <button type="submit" class="btn" style="width:100%;">保存</button>
+        </form>
+    </div>
+</div>
+
+<!-- 模态框：查看客户历史 -->
+<div id="historyModal" class="modal">
+    <div class="modal-content">
+        <span class="close" id="closeHistory">&times;</span>
+        <h3 id="historyCustomerName"></h3>
+        <div id="historyList"></div>
+    </div>
+</div>
+
+<script>
+    (async function() {
+        // ========== 配置 Supabase ==========
+        const SUPABASE_URL = 'https://vocougjfdpjmosdduluz.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZvY291Z2pmZHBqbW9zZGR1bHV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzNTc1MjYsImV4cCI6MjA4NzkzMzUyNn0.cTidPQM-N08eTT7lKHP0TLXZwYb0nv3d1oDYZYLKPws';
+        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        // 全局变量
+        let currentUser = null;
+        let allUsers = [];
+        let allCustomers = [];
+        let allVisits = [];
+        let allCollections = [];
+
+        // UI 状态：已完成计划显示数量
+        let completedDisplayCount = 5;
+
+        // DOM 元素
+        const loginSection = document.getElementById('loginSection');
+        const mainInterface = document.getElementById('mainInterface');
+        const loginBtn = document.getElementById('loginBtn');
+        const usernameSelect = document.getElementById('usernameSelect');
+        const passwordInput = document.getElementById('passwordInput');
+        const loginError = document.getElementById('loginError');
+        const currentUserDisplay = document.getElementById('currentUserDisplay');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const tabs = document.querySelectorAll('.tab');
+        const tabContents = {
+            dashboard: document.getElementById('dashboardTab'),
+            plans: document.getElementById('plansTab'),
+            receivable: document.getElementById('receivableTab'),
+            import: document.getElementById('importTab')
+        };
+
+        // 登录
+        loginBtn.addEventListener('click', async () => {
+            const selectedUsername = usernameSelect.value;
+            const password = passwordInput.value;
+            loginError.innerText = '';
+
+            try {
+                const email = selectedUsername + '@local.host';
+                const { data, error } = await supabaseClient.auth.signInWithPassword({
+                    email: email,
+                    password: password
+                });
+                if (error) throw error;
+
+                await loadUsers();
+                const userRecord = allUsers.find(u => u.username === selectedUsername);
+                if (!userRecord) throw new Error('系统中无此用户记录，请检查 users 表');
+
+                currentUser = userRecord;
+
+                loginSection.style.display = 'none';
+                mainInterface.style.display = 'block';
+                currentUserDisplay.innerText = `${currentUser.username} (${currentUser.role === 'admin' ? '主账号' : '业务员'})`;
+
+                await loadAllData();
+            } catch (err) {
+                loginError.innerText = '登录失败：' + err.message;
+                console.error(err);
+            }
+        });
+
+        logoutBtn.addEventListener('click', async () => {
+            await supabaseClient.auth.signOut();
+            currentUser = null;
+            allUsers = [];
+            loginSection.style.display = 'block';
+            mainInterface.style.display = 'none';
+        });
+
+        async function loadUsers() {
+            const { data, error } = await supabaseClient.from('users').select('*');
+            if (error) throw error;
+            allUsers = data;
+        }
+
+        async function loadAllData() {
+            // 客户
+            let custQuery = supabaseClient.from('customers').select('*');
+            if (currentUser.role !== 'admin') {
+                custQuery = custQuery.eq('sales_id', currentUser.id);
+            }
+            const { data: customers, error: cErr } = await custQuery;
+            if (!cErr) allCustomers = customers;
+
+            // 拜访记录（关联客户名称）
+            let visitQuery = supabaseClient.from('visits').select('*, customers(name)');
+            if (currentUser.role !== 'admin') {
+                visitQuery = visitQuery.eq('sales_id', currentUser.id);
+            }
+            const { data: visits, error: vErr } = await visitQuery;
+            if (!vErr) allVisits = visits;
+
+            // 收款计划
+            let colQuery = supabaseClient.from('collections').select('*, customers(name)');
+            if (currentUser.role !== 'admin') {
+                colQuery = colQuery.eq('sales_id', currentUser.id);
+            }
+            const { data: cols, error: colErr } = await colQuery;
+            if (!colErr) allCollections = cols;
+
+            renderDashboard();
+            renderPlanLists();
+            renderReceivableList();
+        }
+
+        // ========== 首页看板 ==========
+ function renderDashboard() {
+    const salesUsers = allUsers.filter(u => u.role === 'sales');
+    const now = new Date();
+    const currentMonth = now.getMonth() + 1;
+    const currentYear = now.getFullYear();
+
+    // 初始化统计数据
+    const visitCounts = {};
+    const pendingCounts = {};
+    const planAmount = {};
+    const actualAmount = {};
+    salesUsers.forEach(u => {
+        visitCounts[u.id] = 0;
+        pendingCounts[u.id] = 0;
+        planAmount[u.id] = 0;
+        actualAmount[u.id] = 0;
+    });
+
+    // 统计拜访数
+    allVisits.forEach(v => {
+        const d = new Date(v.plan_date);
+        if (d.getMonth() + 1 === currentMonth && d.getFullYear() === currentYear) {
+            if (v.status === 'completed') {
+                visitCounts[v.sales_id] = (visitCounts[v.sales_id] || 0) + 1;
+            } else if (v.status === 'pending') {
+                pendingCounts[v.sales_id] = (pendingCounts[v.sales_id] || 0) + 1;
+            }
+        }
+    });
+
+    // 统计收款（带详细调试）
+    console.log('===== 收款统计调试 =====');
+    console.log('当前月份:', currentYear + '-' + currentMonth);
+    console.log('allCollections 数据:', allCollections);
+
+    allCollections.forEach((c, index) => {
+        console.log(`记录 ${index}:`, c);
+
+        // 解析日期
+        const weekStart = c.week_start;
+        const d = new Date(weekStart);
+        console.log(`  解析日期: ${d}, isValid: ${!isNaN(d.getTime())}`);
+
+        if (isNaN(d.getTime())) {
+            console.warn(`  跳过: 无效日期 ${weekStart}`);
+            return;
+        }
+
+        const recordMonth = d.getMonth() + 1;
+        const recordYear = d.getFullYear();
+        console.log(`  记录月份: ${recordYear}-${recordMonth}`);
+
+        if (recordMonth === currentMonth && recordYear === currentYear) {
+            const salesId = Number(c.sales_id); // 强制转为数字
+            const plan = Number(c.plan_amount) || 0;
+            const actual = Number(c.actual_amount) || 0;
+            console.log(`  匹配! salesId=${salesId}, plan=${plan}, actual=${actual}`);
+
+            planAmount[salesId] = (planAmount[salesId] || 0) + plan;
+            actualAmount[salesId] = (actualAmount[salesId] || 0) + actual;
+        } else {
+            console.log(`  月份不匹配, 跳过`);
+        }
+    });
+
+    console.log('计划金额汇总:', planAmount);
+    console.log('实际金额汇总:', actualAmount);
+
+    // 构建排名数组
+    const visitRank = salesUsers.map(u => ({ username: u.username, value: visitCounts[u.id] || 0 }))
+        .sort((a, b) => b.value - a.value);
+    const pendingRank = salesUsers.map(u => ({ username: u.username, value: pendingCounts[u.id] || 0 }))
+        .sort((a, b) => b.value - a.value);
+    const planRank = salesUsers.map(u => ({ username: u.username, value: planAmount[u.id] || 0 }))
+        .sort((a, b) => b.value - a.value);
+    const completionRank = salesUsers.map(u => {
+        const plan = planAmount[u.id] || 0;
+        const actual = actualAmount[u.id] || 0;
+        const pct = plan > 0 ? ((actual / plan) * 100).toFixed(0) : 0;
+        return { username: u.username, value: pct };
+    }).sort((a, b) => b.value - a.value);
+
+    // 更新DOM
+    document.getElementById('rankVisits').innerHTML = visitRank.map(r =>
+        `<div class="rank-item"><span>${r.username}</span><strong>${r.value}</strong></div>`).join('');
+    document.getElementById('rankPending').innerHTML = pendingRank.map(r =>
+        `<div class="rank-item"><span>${r.username}</span><strong>${r.value}</strong></div>`).join('');
+    document.getElementById('rankPlan').innerHTML = planRank.map(r =>
+        `<div class="rank-item"><span>${r.username}</span><strong>$${Number(r.value).toFixed(2)}</strong></div>`).join('');
+    document.getElementById('rankCompletion').innerHTML = completionRank.map(r =>
+        `<div class="rank-item"><span>${r.username}</span><strong>${r.value}%</strong></div>`).join('');
+}
+        // ========== 拜访计划列表（拆分未完成/已完成，两行布局） ==========
+        function renderPlanLists() {
+            const pendingVisits = allVisits.filter(v => v.status === 'pending')
+                .sort((a,b) => new Date(a.plan_date) - new Date(b.plan_date));
+            const completedVisits = allVisits.filter(v => v.status === 'completed')
+                .sort((a,b) => new Date(b.plan_date) - new Date(a.plan_date));
+
+            renderPendingList(pendingVisits);
+            renderCompletedList(completedVisits);
+        }
+
+        function renderPendingList(visits) {
+            const container = document.getElementById('pendingPlansContainer');
+            if (visits.length === 0) {
+                container.innerHTML = '<p class="text-muted">暂无未完成计划</p>';
+                return;
+            }
+
+            // 只显示前10条（超过10条通过容器滚动查看）
+            const displayVisits = visits.slice(0, 10);
+            container.innerHTML = displayVisits.map(v => {
+                const customer = allCustomers.find(c => c.id === v.customer_id) || { name: '未知客户' };
+                const sales = allUsers.find(u => u.id === v.sales_id);
+                const canDelete = currentUser.role === 'admin' || (v.sales_id === currentUser.id);
+                return `
+                    <div class="plan-item">
+                        <div class="plan-info">
+                            <div class="plan-row1">
+                                <strong>${customer.name}</strong>
+                                <span class="badge">负责: ${sales ? sales.username : '未知'}</span>
+                                <span class="badge">计划: ${v.plan_date}</span>
+                                <span class="badge badge-pending">未完成</span>
+                            </div>
+                            <div class="plan-row2">
+                                ${v.evaluation ? `备注: ${v.evaluation}` : '暂无备注'}
+                            </div>
+                        </div>
+                        <div class="plan-actions">
+                            <button class="btn-small btn-outline" onclick="openCompleteModal(${v.id})">完成</button>
+                            <button class="btn-small btn-outline" onclick="showHistory(${v.customer_id})">历史</button>
+                            ${canDelete ? `<button class="btn-small btn-danger" onclick="deleteVisit(${v.id})">删除</button>` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            if (visits.length > 10) {
+                container.innerHTML += `<p class="text-muted" style="margin-top:8px;">仅展示最近10条，滚动查看更多</p>`;
+            }
+        }
+
+        function renderCompletedList(visits) {
+            const container = document.getElementById('completedPlansContainer');
+            const showMoreBtn = document.getElementById('showMoreCompletedBtn');
+            if (visits.length === 0) {
+                container.innerHTML = '<p class="text-muted">暂无已完成计划</p>';
+                showMoreBtn.style.display = 'none';
+                return;
+            }
+
+            const displayCount = Math.min(completedDisplayCount, visits.length);
+            const displayVisits = visits.slice(0, displayCount);
+
+            container.innerHTML = displayVisits.map(v => {
+                const customer = allCustomers.find(c => c.id === v.customer_id) || { name: '未知客户' };
+                const sales = allUsers.find(u => u.id === v.sales_id);
+                return `
+                    <div class="plan-item">
+                        <div class="plan-info">
+                            <div class="plan-row1">
+                                <strong>${customer.name}</strong>
+                                <span class="badge">负责: ${sales ? sales.username : '未知'}</span>
+                                <span class="badge">计划: ${v.plan_date}</span>
+                                <span class="badge badge-completed">已完成</span>
+                            </div>
+                            <div class="plan-row2">
+                                ${v.evaluation ? `备注: ${v.evaluation}` : '暂无备注'}
+                            </div>
+                        </div>
+                        <div class="plan-actions">
+                            <button class="btn-small btn-outline" onclick="showHistory(${v.customer_id})">历史</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            if (visits.length > 5) {
+                showMoreBtn.style.display = 'block';
+                if (completedDisplayCount >= visits.length) {
+                    showMoreBtn.innerText = '已全部显示';
+                    showMoreBtn.disabled = true;
+                } else {
+                    showMoreBtn.innerText = '展开更多 (5/10)';
+                    showMoreBtn.disabled = false;
+                }
+            } else {
+                showMoreBtn.style.display = 'none';
+            }
+        }
+
+        // 删除计划
+        window.deleteVisit = async function(visitId) {
+            if (!confirm('确定删除该计划吗？')) return;
+            // 可选：检查权限（这里只简单删除，如果RLS未开启则直接删除）
+            const { error } = await supabaseClient
+                .from('visits')
+                .delete()
+                .eq('id', visitId);
+            if (error) {
+                alert('删除失败：' + error.message);
+            } else {
+                await loadAllData();
+            }
+        };
+
+        // 展开更多已完成计划
+        document.getElementById('showMoreCompletedBtn').addEventListener('click', () => {
+            const completedVisits = allVisits.filter(v => v.status === 'completed');
+            if (completedDisplayCount === 5) {
+                completedDisplayCount = 10;
+            } else {
+                completedDisplayCount += 5;
+            }
+            renderCompletedList(completedVisits);
+        });
+
+        // 打开完成拜访模态框
+        window.openCompleteModal = function(visitId) {
+            const visit = allVisits.find(v => v.id === visitId);
+            document.getElementById('completeVisitId').value = visitId;
+            document.getElementById('completeEvaluation').value = visit ? visit.evaluation || '' : '';
+            document.getElementById('completePhoto').value = '';
+            document.getElementById('completeVisitModal').style.display = 'flex';
+        };
+
+        // 提交完成拜访
+        document.getElementById('completeForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const visitId = document.getElementById('completeVisitId').value;
+            const evaluation = document.getElementById('completeEvaluation').value;
+            const photoFile = document.getElementById('completePhoto').files[0];
+            let photoUrl = '';
+            if (photoFile) {
+                photoUrl = await new Promise((res) => {
+                    const reader = new FileReader();
+                    reader.onload = () => res(reader.result);
+                    reader.readAsDataURL(photoFile);
+                });
+            }
+
+            const { error } = await supabaseClient
+                .from('visits')
+                .update({
+                    status: 'completed',
+                    evaluation: evaluation,
+                    photo_url: photoUrl,
+                    actual_date: new Date().toISOString().split('T')[0]
+                })
+                .eq('id', visitId);
+
+            if (error) {
+                alert('更新失败：' + error.message);
+            } else {
+                document.getElementById('completeVisitModal').style.display = 'none';
+                await loadAllData();
+                completedDisplayCount = 5; // 重置显示数量
+            }
+        });
+
+        // 新建计划按钮
+        document.getElementById('addPlanBtn').addEventListener('click', () => {
+            openPlanModal();
+        });
+
+        function openPlanModal() {
+            const select = document.getElementById('planCustomerId');
+            let customersForSelect = allCustomers;
+            if (currentUser.role !== 'admin') {
+                customersForSelect = allCustomers.filter(c => c.sales_id === currentUser.id);
+            }
+            select.innerHTML = customersForSelect.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+
+            document.getElementById('planId').value = '';
+            document.getElementById('planDate').value = new Date().toISOString().split('T')[0];
+            document.getElementById('planEvaluation').value = '';
+            document.getElementById('planModal').style.display = 'flex';
+        }
+
+        // 保存新建计划
+        document.getElementById('planForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const customerId = document.getElementById('planCustomerId').value;
+            const planDate = document.getElementById('planDate').value;
+            const evaluation = document.getElementById('planEvaluation').value;
+
+            const customer = allCustomers.find(c => c.id === parseInt(customerId));
+            if (!customer) {
+                alert('客户不存在');
+                return;
+            }
+            const salesId = customer.sales_id;
+
+            const { error } = await supabaseClient.from('visits').insert({
+                customer_id: customerId,
+                sales_id: salesId,
+                plan_date: planDate,
+                evaluation: evaluation,
+                status: 'pending',
+                photo_url: '',
+                actual_date: null
+            });
+
+            if (error) {
+                alert('保存失败：' + error.message);
+            } else {
+                document.getElementById('planModal').style.display = 'none';
+                await loadAllData();
+            }
+        });
+
+        // 关闭模态框
+        document.getElementById('closePlanModal').addEventListener('click', () => {
+            document.getElementById('planModal').style.display = 'none';
+        });
+        document.getElementById('closeCompleteModal').addEventListener('click', () => {
+            document.getElementById('completeVisitModal').style.display = 'none';
+        });
+
+        // ========== 应收账款 ==========
+        function renderReceivableList() {
+            const container = document.getElementById('receivableList');
+            if (!allCustomers.length) {
+                container.innerHTML = '<p>暂无客户</p>';
+                return;
+            }
+
+            const today = new Date();
+            const day = today.getDay();
+            const diff = today.getDate() - day + (day === 0 ? -6 : 1);
+            const monday = new Date(today.setDate(diff));
+            const weekStart = monday.toISOString().split('T')[0];
+
+            container.innerHTML = allCustomers.map(c => {
+                const weekCol = allCollections.find(col => col.customer_id === c.id && col.week_start === weekStart);
+                const plan = weekCol ? weekCol.plan_amount : 0;
+                const actual = weekCol ? weekCol.actual_amount : 0;
+                const hasPlan = !!weekCol;
+                const buttonText = hasPlan ? '更新收款' : '添加计划';
+                const buttonClass = hasPlan ? 'btn-outline' : 'btn';
+
+                return `
+                    <div class="customer-item">
+                        <div style="flex:2">
+                            <strong>${c.name}</strong><br>
+                            <span>应收余额: $${c.receivable}</span><br>
+                            <span>本周计划: $${plan}  / 实收: $${actual}</span>
+                        </div>
+                        <div style="display: flex; gap: 8px;">
+                            <button class="${buttonClass} btn" onclick="openCollectionModal(${c.id}, ${plan}, ${actual}, ${hasPlan}, '${weekCol ? weekCol.id : ''}')">${buttonText}</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        window.openCollectionModal = function(customerId, currentPlan, currentActual, hasPlan, collectionId) {
+            const modalTitle = document.getElementById('collectionModalTitle');
+            const planInput = document.getElementById('collectionPlan');
+            const planField = document.getElementById('collectionPlanField');
+            const hint = document.getElementById('collectionHint');
+            const existsIdInput = document.getElementById('collectionExistsId');
+
+            document.getElementById('collectionCustomerId').value = customerId;
+            document.getElementById('collectionActual').value = 0; // 默认为0，用户可修改
+
+            if (hasPlan) {
+                // 更新模式：计划金额只读，不可修改
+                modalTitle.innerText = '更新收款';
+                planInput.value = currentPlan;
+                planInput.readOnly = true;
+                hint.innerText = '提示：计划金额不可修改，仅可增加本次实收金额。';
+                existsIdInput.value = collectionId;
+            } else {
+                // 添加模式：计划金额可输入，默认0
+                modalTitle.innerText = '添加计划收款';
+                planInput.value = 0;
+                planInput.readOnly = false;
+                hint.innerText = '提示：计划金额将保存为本月计划，实收金额可累加。';
+                existsIdInput.value = '';
+            }
+            document.getElementById('collectionModal').style.display = 'flex';
+        };
+
+        document.getElementById('collectionForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const customerId = document.getElementById('collectionCustomerId').value;
+            const plan = parseFloat(document.getElementById('collectionPlan').value) || 0;
+            const actualIncrement = parseFloat(document.getElementById('collectionActual').value) || 0;
+            const existsId = document.getElementById('collectionExistsId').value;
+
+            const customer = allCustomers.find(c => c.id === parseInt(customerId));
+            if (!customer) {
+                alert('客户不存在');
+                return;
+            }
+            const salesId = customer.sales_id;
+
+            const today = new Date();
+            const day = today.getDay();
+            const diff = today.getDate() - day + (day === 0 ? -6 : 1);
+            const monday = new Date(today.setDate(diff));
+            const weekStart = monday.toISOString().split('T')[0];
+
+            if (existsId) {
+                // 更新模式：只累加实际金额，计划金额不变
+                const { data: existing } = await supabaseClient
+                    .from('collections')
+                    .select('actual_amount')
+                    .eq('id', existsId)
+                    .single();
+                if (existing) {
+                    const newActual = (existing.actual_amount || 0) + actualIncrement;
+                    const { error } = await supabaseClient
+                        .from('collections')
+                        .update({ actual_amount: newActual })
+                        .eq('id', existsId);
+                    if (error) alert('更新失败：' + error.message);
+                }
+            } else {
+                // 添加模式：插入新记录，计划金额为输入的plan，实际金额为输入的actualIncrement
+                const { error } = await supabaseClient
+                    .from('collections')
+                    .insert({
+                        customer_id: customerId,
+                        sales_id: salesId,
+                        week_start: weekStart,
+                        plan_amount: plan,
+                        actual_amount: actualIncrement
+                    });
+                if (error) alert('添加失败：' + error.message);
+            }
+
+            document.getElementById('collectionModal').style.display = 'none';
+            await loadAllData();
+        });
+
+        document.getElementById('closeCollectionModal').addEventListener('click', () => {
+            document.getElementById('collectionModal').style.display = 'none';
+        });
+
+        // ========== 客户历史 ==========
+        window.showHistory = async function(customerId) {
+            const customer = allCustomers.find(c => c.id === customerId);
+            document.getElementById('historyCustomerName').innerText = customer ? customer.name : '客户历史';
+            const { data } = await supabaseClient
+                .from('visits')
+                .select('*')
+                .eq('customer_id', customerId)
+                .order('plan_date', { ascending: false });
+            const historyList = document.getElementById('historyList');
+            if (!data || data.length === 0) {
+                historyList.innerHTML = '<p>暂无拜访记录</p>';
+            } else {
+                historyList.innerHTML = data.map(v => `
+                    <div class="history-item">
+                        <div><strong>${v.plan_date}</strong> ${v.status === 'completed' ? '✅ 已完成' : '⏳ 未完成'}</div>
+                        ${v.evaluation ? '<p>备注：'+v.evaluation+'</p>' : ''}
+                        ${v.photo_url ? '<div class="photo-placeholder"><i class="fas fa-image"></i> 有照片</div>' : ''}
+                    </div>
+                `).join('');
+            }
+            document.getElementById('historyModal').style.display = 'flex';
+        };
+
+        document.getElementById('closeHistory').addEventListener('click', () => {
+            document.getElementById('historyModal').style.display = 'none';
+        });
+
+        // ========== 导入客户 ==========
+        document.getElementById('importCustomersBtn').addEventListener('click', async () => {
+            const raw = document.getElementById('importCustomerData').value;
+            try {
+                const list = JSON.parse(raw);
+                const errors = [];
+                for (let item of list) {
+                    const salesUser = allUsers.find(u => u.username === item.sales);
+                    if (!salesUser) {
+                        errors.push(`业务员 ${item.sales} 不存在，跳过`);
+                        continue;
+                    }
+                    const { error } = await supabaseClient.from('customers').insert({
+                        name: item.name,
+                        sales_id: salesUser.id,
+                        receivable: item.receivable || 0
+                    });
+                    if (error) errors.push(`导入失败 ${item.name}: ${error.message}`);
+                }
+                if (errors.length) {
+                    document.getElementById('importMessage').innerHTML = '部分错误：<br>' + errors.join('<br>');
+                } else {
+                    document.getElementById('importMessage').innerText = '导入成功！';
+                }
+                await loadAllData();
+            } catch (err) {
+                alert('JSON格式错误：' + err);
+            }
+        });
+
+        document.getElementById('refreshReceivableBtn').addEventListener('click', loadAllData);
+
+        // 选项卡切换
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                const target = tab.dataset.tab;
+                tabs.forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                for (let key in tabContents) {
+                    tabContents[key].style.display = key === target ? 'block' : 'none';
+                }
+            });
+        });
+
+        // 点击模态框外部关闭
+        window.addEventListener('click', (e) => {
+            if (e.target.classList.contains('modal')) {
+                e.target.style.display = 'none';
+            }
+        });
+
+        document.querySelectorAll('.close').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.target.closest('.modal').style.display = 'none';
+            });
+        });
+    })();
+</script>
+</body>
+</html>

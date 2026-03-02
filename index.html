@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>销售团队管理 · 坦桑尼亚版（刷新保持登录+CSV优化）</title>
+    <title>销售团队管理 · 最终版（Excel导入+刷新保持）</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+    <!-- 引入 SheetJS 用于处理 Excel -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
-        /* 样式与之前相同，保持不变（略） */
         * { box-sizing: border-box; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 0; }
         body { background: #f0f2f5; padding: 16px; }
         .app-container { max-width: 1200px; margin: 0 auto; }
@@ -153,17 +153,17 @@
             <div id="receivableList"></div>
         </div>
 
-        <!-- 导入数据（增强版：CSV+模板+JSON备选） -->
+        <!-- 导入数据（Excel导入+备选JSON） -->
         <div id="importTab" class="tab-content" style="display: none;">
-            <h4>批量导入客户 (CSV格式，金额请填写纯数字，例如 5000.00)</h4>
+            <h4>批量导入客户 (Excel格式)</h4>
             <div style="margin-bottom: 15px;">
-                <button class="btn-outline btn" id="downloadCsvTemplate"><i class="fas fa-download"></i> 下载CSV模板</button>
+                <button class="btn-outline btn" id="downloadExcelTemplate"><i class="fas fa-download"></i> 下载Excel模板</button>
             </div>
             <div>
-                <input type="file" id="csvFileInput" accept=".csv" style="margin-bottom: 10px;">
-                <button class="btn" id="uploadCsvBtn"><i class="fas fa-upload"></i> 上传并导入</button>
+                <input type="file" id="excelFileInput" accept=".xlsx, .xls" style="margin-bottom: 10px;">
+                <button class="btn" id="uploadExcelBtn"><i class="fas fa-upload"></i> 上传并导入</button>
             </div>
-            <div id="csvImportMessage" class="error" style="margin-top: 10px; white-space: pre-line;"></div>
+            <div id="excelImportMessage" class="error" style="margin-top: 10px; white-space: pre-line;"></div>
 
             <div class="import-section">
                 <h4>备选：JSON导入</h4>
@@ -190,17 +190,128 @@
     </div>
 </div>
 
-<!-- 所有模态框内容（与之前相同，此处省略以节省篇幅，实际代码中需保留） -->
-<!-- 请保留原有模态框 HTML 代码（planModal, completeVisitModal, collectionModal, addCustomerModal, transferCustomerModal, addEmployeeModal, changePwdModal, historyModal），此处仅示意 -->
-<!-- 为了完整性，以下仅列出必要的div结构，实际使用时请将之前版本的所有模态框代码粘贴在此处 -->
-<div id="planModal" class="modal"><!--...--></div>
-<div id="completeVisitModal" class="modal"><!--...--></div>
-<div id="collectionModal" class="modal"><!--...--></div>
-<div id="addCustomerModal" class="modal"><!--...--></div>
-<div id="transferCustomerModal" class="modal"><!--...--></div>
-<div id="addEmployeeModal" class="modal"><!--...--></div>
-<div id="changePwdModal" class="modal"><!--...--></div>
-<div id="historyModal" class="modal"><!--...--></div>
+<!-- 模态框：新建拜访计划 -->
+<div id="planModal" class="modal">
+    <div class="modal-content">
+        <span class="close" id="closePlanModal">&times;</span>
+        <h3>新建拜访计划</h3>
+        <form id="planForm">
+            <input type="hidden" id="planId">
+            <label>选择客户</label>
+            <select id="planCustomerId" required style="width:100%; padding:10px; border-radius:40px; border:1px solid #ccc; margin-bottom:15px;"></select>
+            <label>计划拜访日期</label>
+            <input type="date" id="planDate" required style="width:100%; padding:10px; border-radius:40px; border:1px solid #ccc; margin-bottom:15px;">
+            <label>备注（目的/初始评价）</label>
+            <textarea id="planEvaluation" rows="3" style="width:100%; border-radius:16px; padding:10px; border:1px solid #ccc; margin-bottom:15px;" placeholder="可填写拜访目的或初步想法"></textarea>
+            <button type="submit" class="btn" style="width:100%;">保存计划</button>
+        </form>
+    </div>
+</div>
+
+<!-- 模态框：完成拜访 -->
+<div id="completeVisitModal" class="modal">
+    <div class="modal-content">
+        <span class="close" id="closeCompleteModal">&times;</span>
+        <h3>完成拜访</h3>
+        <form id="completeForm">
+            <input type="hidden" id="completeVisitId">
+            <label>备注（拜访评价/反馈）</label>
+            <textarea id="completeEvaluation" rows="3" required style="width:100%; border-radius:16px; padding:10px; border:1px solid #ccc; margin-bottom:15px;" placeholder="填写拜访内容、结果、反馈等"></textarea>
+            <label>上传照片 (模拟)</label>
+            <input type="file" id="completePhoto" accept="image/*" style="margin:10px 0;">
+            <button type="submit" class="btn" style="width:100%;">提交完成</button>
+        </form>
+    </div>
+</div>
+
+<!-- 模态框：添加/更新收款 -->
+<div id="collectionModal" class="modal">
+    <div class="modal-content">
+        <span class="close" id="closeCollectionModal">&times;</span>
+        <h3 id="collectionModalTitle">添加计划收款</h3>
+        <form id="collectionForm">
+            <input type="hidden" id="collectionCustomerId">
+            <input type="hidden" id="collectionExistsId">
+            <div id="collectionPlanField">
+                <label>本周计划金额 (总额)</label>
+                <input type="number" id="collectionPlan" step="0.01" required style="width:100%; padding:10px; border-radius:40px; border:1px solid #ccc; margin-bottom:15px;">
+            </div>
+            <label>本次实收金额 (本次增加的金额)</label>
+            <input type="number" id="collectionActual" step="0.01" value="0" required style="width:100%; padding:10px; border-radius:40px; border:1px solid #ccc; margin-bottom:15px;">
+            <p class="text-muted" id="collectionHint">提示：计划金额将保存为本月计划，实收金额累加到本周总额。</p>
+            <button type="submit" class="btn" style="width:100%;">保存</button>
+        </form>
+    </div>
+</div>
+
+<!-- 模态框：新增客户 -->
+<div id="addCustomerModal" class="modal">
+    <div class="modal-content">
+        <span class="close" id="closeAddCustomerModal">&times;</span>
+        <h3>新增客户</h3>
+        <form id="addCustomerForm">
+            <label>客户名称</label>
+            <input type="text" id="newCustomerName" required style="width:100%; padding:10px; border-radius:40px; border:1px solid #ccc; margin-bottom:15px;">
+            <label>选择业务员</label>
+            <select id="newCustomerSales" required style="width:100%; padding:10px; border-radius:40px; border:1px solid #ccc; margin-bottom:15px;"></select>
+            <label>应收金额</label>
+            <input type="number" id="newCustomerReceivable" step="0.01" value="0" required style="width:100%; padding:10px; border-radius:40px; border:1px solid #ccc; margin-bottom:15px;">
+            <button type="submit" class="btn" style="width:100%;">保存</button>
+        </form>
+    </div>
+</div>
+
+<!-- 模态框：转移客户 -->
+<div id="transferCustomerModal" class="modal">
+    <div class="modal-content">
+        <span class="close" id="closeTransferModal">&times;</span>
+        <h3>转移客户</h3>
+        <form id="transferForm">
+            <input type="hidden" id="transferCustomerId">
+            <label>选择新业务员</label>
+            <select id="transferSalesId" required style="width:100%; padding:10px; border-radius:40px; border:1px solid #ccc; margin-bottom:15px;"></select>
+            <button type="submit" class="btn" style="width:100%;">确认转移</button>
+        </form>
+    </div>
+</div>
+
+<!-- 模态框：添加员工 -->
+<div id="addEmployeeModal" class="modal">
+    <div class="modal-content">
+        <span class="close" id="closeAddEmployeeModal">&times;</span>
+        <h3>添加员工</h3>
+        <form id="addEmployeeForm">
+            <label>用户名（仅字母）</label>
+            <input type="text" id="newEmployeeUsername" pattern="[A-Za-z]+" title="只能输入英文字母" required style="width:100%; padding:10px; border-radius:40px; border:1px solid #ccc; margin-bottom:15px;">
+            <p class="text-muted">初始密码统一为 123456</p>
+            <button type="submit" class="btn" style="width:100%;">创建员工</button>
+        </form>
+    </div>
+</div>
+
+<!-- 模态框：修改密码 -->
+<div id="changePwdModal" class="modal">
+    <div class="modal-content">
+        <span class="close" id="closeChangePwdModal">&times;</span>
+        <h3>修改密码</h3>
+        <form id="changePwdForm">
+            <label>新密码</label>
+            <input type="password" id="newPassword" required minlength="6" style="width:100%; padding:10px; border-radius:40px; border:1px solid #ccc; margin-bottom:15px;">
+            <label>确认新密码</label>
+            <input type="password" id="confirmPassword" required minlength="6" style="width:100%; padding:10px; border-radius:40px; border:1px solid #ccc; margin-bottom:15px;">
+            <button type="submit" class="btn" style="width:100%;">更新密码</button>
+        </form>
+    </div>
+</div>
+
+<!-- 模态框：查看客户历史 -->
+<div id="historyModal" class="modal">
+    <div class="modal-content">
+        <span class="close" id="closeHistory">&times;</span>
+        <h3 id="historyCustomerName"></h3>
+        <div id="historyList"></div>
+    </div>
+</div>
 
 <script>
     (async function() {
@@ -208,7 +319,7 @@
         const SUPABASE_URL = 'https://vocougjfdpjmosdduluz.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZvY291Z2pmZHBqbW9zZGR1bHV6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzNTc1MjYsImV4cCI6MjA4NzkzMzUyNn0.cTidPQM-N08eTT7lKHP0TLXZwYb0nv3d1oDYZYLKPws';
         // 服务角色密钥（可选，用于删除Auth用户）
-        // const SUPABASE_SERVICE_ROLE_KEY = '你的service_role_key';
+        // const SUPABASE_SERVICE_ROLE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZvY291Z2pmZHBqbW9zZGR1bHV6Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjM1NzUyNiwiZXhwIjoyMDg3OTMzNTI2fQ.xfCVP6RetOnOJSo1fYph7FbcXwtZaUnmDOsPhr70OnQ';
 
         const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -252,48 +363,47 @@
         }
 
         // ========== 恢复会话（刷新后自动登录） ==========
-async function restoreSession() {
-    const { data: { session }, error } = await supabaseClient.auth.getSession();
-    if (error) {
-        console.warn('获取会话失败', error);
-        return;
-    }
-    if (session) {
-        console.log('检测到会话，用户邮箱：', session.user.email);
-        const email = session.user.email;
-        const username = email.split('@')[0];
-        await loadUsers(); // 加载 users 表
-        console.log('当前 users 表：', allUsers);
-        const userRecord = allUsers.find(u => u.username === username);
-        if (userRecord) {
-            currentUser = userRecord;
-            loginSection.style.display = 'none';
-            mainInterface.style.display = 'block';
-            currentUserDisplay.innerText = `${currentUser.username} (${currentUser.role === 'admin' ? '主账号' : '业务员'})`;
-
-            // 动态添加员工选项卡（admin）
-            if (currentUser.role === 'admin') {
-                if (!document.querySelector('.tab[data-tab="employees"]')) {
-                    const empTab = document.createElement('div');
-                    empTab.className = 'tab';
-                    empTab.dataset.tab = 'employees';
-                    empTab.innerText = '员工管理';
-                    tabContainer.appendChild(empTab);
-                    bindTabs();
-                }
-            } else {
-                const empTab = document.querySelector('.tab[data-tab="employees"]');
-                if (empTab) empTab.remove();
+        async function restoreSession() {
+            const { data: { session }, error } = await supabaseClient.auth.getSession();
+            if (error) {
+                console.warn('获取会话失败', error);
+                return;
             }
+            if (session) {
+                console.log('检测到会话，用户邮箱：', session.user.email);
+                const email = session.user.email;
+                const username = email.split('@')[0];
+                await loadUsers(); // 加载 users 表
+                console.log('当前 users 表：', allUsers);
+                const userRecord = allUsers.find(u => u.username === username);
+                if (userRecord) {
+                    currentUser = userRecord;
+                    loginSection.style.display = 'none';
+                    mainInterface.style.display = 'block';
+                    currentUserDisplay.innerText = `${currentUser.username} (${currentUser.role === 'admin' ? '主账号' : '业务员'})`;
 
-            await loadAllData();
-        } else {
-            console.warn('会话中的用户未在 users 表中找到：', username);
-            // 可选：自动修复？这里仅提示并退出
-            await supabaseClient.auth.signOut();
+                    // 动态添加员工选项卡（admin）
+                    if (currentUser.role === 'admin') {
+                        if (!document.querySelector('.tab[data-tab="employees"]')) {
+                            const empTab = document.createElement('div');
+                            empTab.className = 'tab';
+                            empTab.dataset.tab = 'employees';
+                            empTab.innerText = '员工管理';
+                            tabContainer.appendChild(empTab);
+                            bindTabs();
+                        }
+                    } else {
+                        const empTab = document.querySelector('.tab[data-tab="employees"]');
+                        if (empTab) empTab.remove();
+                    }
+
+                    await loadAllData();
+                } else {
+                    console.warn('会话中的用户未在 users 表中找到：', username);
+                    await supabaseClient.auth.signOut();
+                }
+            }
         }
-    }
-}
 
         // 绑定选项卡
         function bindTabs() {
@@ -366,7 +476,6 @@ async function restoreSession() {
             allUsers = [];
             loginSection.style.display = 'block';
             mainInterface.style.display = 'none';
-            // 移除员工选项卡
             const empTab = document.querySelector('.tab[data-tab="employees"]');
             if (empTab) empTab.remove();
         });
@@ -405,7 +514,7 @@ async function restoreSession() {
             if (currentUser.role === 'admin') renderEmployeesList();
         }
 
-        // ========== 首页看板（已修复） ==========
+        // ========== 首页看板 ==========
         function renderDashboard() {
             const salesUsers = allUsers.filter(u => u.role === 'sales');
             const now = new Date();
@@ -463,7 +572,7 @@ async function restoreSession() {
                 `<div class="rank-item"><span>${r.username}</span><strong>${r.value}%</strong></div>`).join('');
         }
 
-        // ========== 拜访计划（与原版一致，略） ==========
+        // ========== 拜访计划 ==========
         function renderPlanLists() {
             const pendingVisits = allVisits.filter(v => v.status === 'pending')
                 .sort((a,b) => new Date(a.plan_date) - new Date(b.plan_date));
@@ -855,101 +964,96 @@ async function restoreSession() {
             }
         });
 
-        // ========== CSV导入（优化版） ==========
-document.getElementById('downloadCsvTemplate').addEventListener('click', () => {
-    // 准备数据：列头 + 示例行
-    const data = [
-        ['客户名称', '业务员用户名', '应收金额'],
-        ['示例公司', 'ernest', 5000.00]
-    ];
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.aoa_to_sheet(data);
-    XLSX.utils.book_append_sheet(wb, ws, '模板');
-    XLSX.writeFile(wb, '客户导入模板.xlsx');
-});
+        // ========== Excel导入 ==========
+        document.getElementById('downloadExcelTemplate').addEventListener('click', () => {
+            const data = [
+                ['客户名称', '业务员用户名', '应收金额'],
+                ['示例公司', 'ernest', 5000.00]
+            ];
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.aoa_to_sheet(data);
+            XLSX.utils.book_append_sheet(wb, ws, '模板');
+            XLSX.writeFile(wb, '客户导入模板.xlsx');
+        });
 
-document.getElementById('uploadCsvBtn').addEventListener('click', async () => {
-    const fileInput = document.getElementById('csvFileInput');
-    const file = fileInput.files[0];
-    if (!file) { alert('请选择 Excel 文件'); return; }
+        document.getElementById('uploadExcelBtn').addEventListener('click', async () => {
+            const fileInput = document.getElementById('excelFileInput');
+            const file = fileInput.files[0];
+            if (!file) { alert('请选择 Excel 文件'); return; }
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        const data = new Uint8Array(e.target.result);
-        const wb = XLSX.read(data, { type: 'array' });
-        const firstSheet = wb.SheetNames[0];
-        const rows = XLSX.utils.sheet_to_json(wb.Sheets[firstSheet], { header: 1, defval: '' });
-        if (rows.length < 2) { alert('文件至少需要标题行和一行数据'); return; }
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const data = new Uint8Array(e.target.result);
+                const wb = XLSX.read(data, { type: 'array' });
+                const firstSheet = wb.SheetNames[0];
+                const rows = XLSX.utils.sheet_to_json(wb.Sheets[firstSheet], { header: 1, defval: '' });
+                if (rows.length < 2) { alert('文件至少需要标题行和一行数据'); return; }
 
-        const header = rows[0].map(s => String(s).trim());
-        const nameIdx = header.indexOf('客户名称');
-        const salesIdx = header.indexOf('业务员用户名');
-        const amountIdx = header.indexOf('应收金额');
-        if (nameIdx === -1 || salesIdx === -1 || amountIdx === -1) {
-            alert('Excel 标题必须包含：客户名称, 业务员用户名, 应收金额');
-            return;
-        }
-
-        const success = [];
-        const failed = [];
-        for (let i = 1; i < rows.length; i++) {
-            const row = rows[i];
-            const name = row[nameIdx]?.toString().trim();
-            const salesUsername = row[salesIdx]?.toString().trim();
-            let amountStr = row[amountIdx]?.toString().trim() || '0';
-            // 移除可能存在的千分符（逗号）
-            amountStr = amountStr.replace(/,/g, '');
-            const amount = parseFloat(amountStr) || 0;
-
-            // 后续业务逻辑与 CSV 版本完全相同（检查用户名、查重、插入等）
-            // 请将原来 CSV 解析后的业务处理代码直接粘贴在此处，并适当调整变量名
-        }
-
-        // 显示结果
-        document.getElementById('csvImportMessage').innerText = `导入完成。成功: ${success.length} 条，失败: ${failed.length} 条。\n失败详情：${failed.join('\n')}`;
-        fileInput.value = '';
-        loadAllData();
-    };
-    reader.readAsArrayBuffer(file);
-});
-                if (!name) {
-                    failed.push(`行 ${i+1}: 客户名称为空`);
-                    continue;
-                }
-                if (!salesUsername) {
-                    failed.push(`行 ${i+1}: 业务员用户名为空`);
-                    continue;
+                const header = rows[0].map(s => String(s).trim());
+                const nameIdx = header.indexOf('客户名称');
+                const salesIdx = header.indexOf('业务员用户名');
+                const amountIdx = header.indexOf('应收金额');
+                if (nameIdx === -1 || salesIdx === -1 || amountIdx === -1) {
+                    alert('Excel 标题必须包含：客户名称, 业务员用户名, 应收金额');
+                    return;
                 }
 
-                const salesUser = allUsers.find(u => u.username === salesUsername && u.role === 'sales');
-                if (!salesUser) {
-                    failed.push(`行 ${i+1}: 业务员 ${salesUsername} 不存在`);
-                    continue;
+                const success = [];
+                const failed = [];
+                for (let i = 1; i < rows.length; i++) {
+                    const row = rows[i];
+                    const name = row[nameIdx]?.toString().trim();
+                    const salesUsername = row[salesIdx]?.toString().trim();
+                    let amountStr = row[amountIdx]?.toString().trim() || '0';
+                    amountStr = amountStr.replace(/,/g, ''); // 移除千分符
+                    const amount = parseFloat(amountStr) || 0;
+
+                    if (!name) {
+                        failed.push(`行 ${i+1}: 客户名称为空`);
+                        continue;
+                    }
+                    if (!salesUsername) {
+                        failed.push(`行 ${i+1}: 业务员用户名为空`);
+                        continue;
+                    }
+
+                    const salesUser = allUsers.find(u => u.username === salesUsername && u.role === 'sales');
+                    if (!salesUser) {
+                        failed.push(`行 ${i+1}: 业务员 ${salesUsername} 不存在`);
+                        continue;
+                    }
+
+                    // 检查客户名是否已存在
+                    if (allCustomers.some(c => c.name === name)) {
+                        failed.push(`行 ${i+1}: 客户名 "${name}" 已存在，跳过`);
+                        continue;
+                    }
+
+                    // 插入
+                    supabaseClient.from('customers').insert({
+                        name,
+                        sales_id: salesUser.id,
+                        receivable: amount
+                    }).then(({ error }) => {
+                        if (error) {
+                            failed.push(`行 ${i+1}: ${error.message}`);
+                        } else {
+                            success.push(name);
+                        }
+                    }).catch(err => {
+                        failed.push(`行 ${i+1}: ${err.message}`);
+                    });
                 }
 
-                // 检查客户名是否已存在（避免重复）
-                const existing = allCustomers.find(c => c.name === name);
-                if (existing) {
-                    failed.push(`行 ${i+1}: 客户名 "${name}" 已存在，跳过`);
-                    continue;
-                }
-
-                const { error } = await supabaseClient.from('customers').insert({
-                    name,
-                    sales_id: salesUser.id,
-                    receivable: amount
-                });
-                if (error) {
-                    failed.push(`行 ${i+1}: ${error.message}`);
-                } else {
-                    success.push(name);
-                }
-            }
-
-            const msg = `导入完成。成功: ${success.length} 条，失败: ${failed.length} 条。\n失败详情：\n${failed.join('\n')}`;
-            document.getElementById('csvImportMessage').innerText = msg;
-            fileInput.value = '';
-            await loadAllData();
+                // 等待所有插入完成（简单起见，setTimeout后重新加载数据）
+                setTimeout(async () => {
+                    const msg = `导入完成。成功: ${success.length} 条，失败: ${failed.length} 条。\n失败详情：\n${failed.join('\n')}`;
+                    document.getElementById('excelImportMessage').innerText = msg;
+                    fileInput.value = '';
+                    await loadAllData();
+                }, 500);
+            };
+            reader.readAsArrayBuffer(file);
         });
 
         // ========== JSON导入 ==========

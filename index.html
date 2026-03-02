@@ -1364,13 +1364,43 @@
                             receivable
                         }).eq('id', existing.id);
                         if (updErr) { failed.push(`行 ${i+1}: 更新客户失败 ${updErr.message}`); continue; }
-                        const monthStart = formatMonthStart(new Date());
-                        const col = allCollections.find(c => c.customer_id === existing.id && c.month_start === monthStart);
-                        if (col) {
-                            const { error: colErr } = await supabaseClient.from('collections').update({ plan_amount: planAmount }).eq('id', col.id);
-                            if (colErr) failed.push(`行 ${i+1}: 更新计划失败 ${colErr.message}`);
-                            else success.push(name);
-                        } else {
+                      const monthStart = formatMonthStart(new Date());
+
+// 实时查询当月是否存在记录
+const { data: existingCol, error: queryErr } = await supabaseClient
+    .from('collections')
+    .select('id, actual_amount')
+    .eq('customer_id', existing.id)
+    .eq('month_start', monthStart)
+    .maybeSingle();
+
+if (queryErr) {
+    failed.push(`行 ${i+1}: 查询计划失败 ${queryErr.message}`);
+    continue;
+}
+
+if (existingCol) {
+    // 存在则只更新计划金额，保留原实收金额
+    const { error: colErr } = await supabaseClient
+        .from('collections')
+        .update({ plan_amount: planAmount })
+        .eq('id', existingCol.id);
+    if (colErr) failed.push(`行 ${i+1}: 更新计划失败 ${colErr.message}`);
+    else success.push(name);
+} else {
+    // 不存在则插入新计划，实收为 0
+    const { error: colErr } = await supabaseClient
+        .from('collections')
+        .insert({
+            customer_id: existing.id,
+            sales_id: salesUser.id,
+            month_start: monthStart,
+            plan_amount: planAmount,
+            actual_amount: 0
+        });
+    if (colErr) failed.push(`行 ${i+1}: 插入计划失败 ${colErr.message}`);
+    else success.push(name);
+}else {
                             const { error: colErr } = await supabaseClient.from('collections').insert({
                                 customer_id: existing.id,
                                 sales_id: salesUser.id,

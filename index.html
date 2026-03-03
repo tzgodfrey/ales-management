@@ -362,6 +362,7 @@
                 passwordLabel: 'Password',
                 loginBtnText: 'Login',
                 loginHint: 'Default password is 123456, can be changed after login.',
+                loginFailed: 'Login failed: ',
                 appTitle: 'HuaYi Sales Team Welcome You',
                 slogan: '✨ Every visit is a step to success!',
                 changePwdBtnText: 'Change Password',
@@ -454,6 +455,7 @@
                 customerNameExists: 'Customer name already exists',
                 noRecords: 'No records',
                 importing: 'Importing, please wait...',
+                fileReadError: 'File read failed',
             },
             zh: {
                 loginTitle: '华亿汽配',
@@ -461,6 +463,7 @@
                 passwordLabel: '密码',
                 loginBtnText: '登录',
                 loginHint: '初始密码统一为123456，登录后可修改。',
+                loginFailed: '登录失败：',
                 appTitle: '华亿销售团队欢迎你',
                 slogan: '✨ 每一次拜访，都是成功的积累！',
                 changePwdBtnText: '修改密码',
@@ -553,6 +556,7 @@
                 customerNameExists: '客户名称已存在',
                 noRecords: '暂无记录',
                 importing: '正在导入，请稍候...',
+                fileReadError: '文件读取失败',
             }
         };
 
@@ -576,6 +580,7 @@
             const empTab = document.querySelector('.tab[data-tab="employees"]');
             if (empTab) empTab.innerText = t.tabEmployees;
             document.getElementById('dashboardTitle').innerHTML = `<i class="fas fa-trophy" style="color: #fbbf24;"></i> ${t.dashboardTitle}`;
+            // 月份选项
             document.getElementById('rangeThisMonth').innerText = t.thisMonth;
             document.getElementById('rangeLastMonth').innerText = t.lastMonth;
             document.getElementById('rangeLast3Months').innerText = t.last3Months;
@@ -822,7 +827,7 @@
                 }
                 await loadAllData();
             } catch (err) {
-                loginError.innerText = 'Login failed: ' + err.message;
+                loginError.innerText = i18n[currentLang].loginFailed + err.message;
             }
         });
 
@@ -1335,11 +1340,11 @@
             const t = i18n[currentLang];
             if (!file) { alert(t.uploadBtnText); return; }
 
-            // 获取加载模态框元素
+            // 获取加载模态框元素（安全判断）
             const loadingModal = document.getElementById('loadingModal');
             const loadingText = document.getElementById('loadingText');
             if (loadingModal && loadingText) {
-                loadingText.innerText = t.importing || '正在导入，请稍候...';
+                loadingText.innerText = t.importing;
                 loadingModal.style.display = 'flex';
             }
 
@@ -1384,7 +1389,7 @@
                             continue;
                         }
 
-                        // 查询客户是否存在
+                        // 查询客户是否存在（实时）
                         let { data: existingCust } = await supabaseClient
                             .from('customers')
                             .select('*')
@@ -1415,7 +1420,7 @@
                             existingCust = newCust;
                         }
 
-                        // 处理月度计划
+                        // 处理月度计划（实时查询）
                         const monthStart = formatMonthStart(new Date());
                         const { data: existingCol, error: queryErr } = await supabaseClient
                             .from('collections')
@@ -1479,7 +1484,7 @@
             };
             reader.onerror = () => {
                 if (loadingModal) loadingModal.style.display = 'none';
-                alert('文件读取失败');
+                alert(i18n[currentLang].fileReadError);
             };
             reader.readAsArrayBuffer(file);
         });

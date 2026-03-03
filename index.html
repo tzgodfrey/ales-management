@@ -1319,126 +1319,143 @@
             XLSX.writeFile(wb, '客户导入模板.xlsx');
         });
         document.getElementById('uploadExcelBtn').addEventListener('click', async () => {
-            const fileInput = document.getElementById('excelFileInput');
-            const file = fileInput.files[0];
-            const t = i18n[currentLang];
-            if (!file) { alert(t.uploadBtnText); return; }
-            const reader = new FileReader();
-            reader.onload = async (e) => {
-                const data = new Uint8Array(e.target.result);
-                const wb = XLSX.read(data, { type: 'array' });
-                const sheet = wb.SheetNames[0];
-                const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheet], { header: 1, defval: '' });
-                if (rows.length < 2) { alert(t.importFailDetail); return; }
-                const header = rows[0].map(s => String(s).trim());
-                const nameIdx = header.indexOf('客户名称');
-                const salesIdx = header.indexOf('业务员用户名');
-                const receivableIdx = header.indexOf('应收金额');
-                const planIdx = header.indexOf('本月计划金额');
-                if (nameIdx === -1 || salesIdx === -1 || receivableIdx === -1 || planIdx === -1) {
-                    alert(t.importFailDetail);
-                    return;
+    const fileInput = document.getElementById('excelFileInput');
+    const file = fileInput.files[0];
+    const t = i18n[currentLang];
+    if (!file) { alert(t.uploadBtnText); return; }
+
+    // 显示加载提示
+    document.getElementById('loadingModal').style.display = 'flex';
+    document.getElementById('loadingText').innerText = t.importing || '正在导入，请稍候...';
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+        try {
+            const data = new Uint8Array(e.target.result);
+            const wb = XLSX.read(data, { type: 'array' });
+            const sheet = wb.SheetNames[0];
+            const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheet], { header: 1, defval: '' });
+            if (rows.length < 2) { alert(t.importFailDetail); return; }
+            const header = rows[0].map(s => String(s).trim());
+            const nameIdx = header.indexOf('客户名称');
+            const salesIdx = header.indexOf('业务员用户名');
+            const receivableIdx = header.indexOf('应收金额');
+            const planIdx = header.indexOf('本月计划金额');
+            if (nameIdx === -1 || salesIdx === -1 || receivableIdx === -1 || planIdx === -1) {
+                alert(t.importFailDetail);
+                return;
+            }
+
+            const success = [], failed = [];
+            for (let i = 1; i < rows.length; i++) {
+                const row = rows[i];
+                const name = row[nameIdx]?.toString().trim();
+                const salesUsername = row[salesIdx]?.toString().trim();
+                const receivable = parseFloat((row[receivableIdx]?.toString() || '0').replace(/,/g, '')) || 0;
+                const planAmount = parseFloat((row[planIdx]?.toString() || '0').replace(/,/g, '')) || 0;
+
+                if (!name) { failed.push(`行 ${i+1}: 客户名称为空`); continue; }
+                if (!salesUsername) { failed.push(`行 ${i+1}: 业务员用户名为空`); continue; }
+
+                const lowerUsername = salesUsername.trim().toLowerCase();
+                const salesUser = allUsers.find(u => u.username.toLowerCase().trim() === lowerUsername);
+                if (!salesUser) {
+                    failed.push(`行 ${i+1}: 业务员 ${salesUsername} 不存在`);
+                    continue;
                 }
-                const success = [], failed = [];
-                for (let i = 1; i < rows.length; i++) {
-                    const row = rows[i];
-                    const name = row[nameIdx]?.toString().trim();
-                    const salesUsername = row[salesIdx]?.toString().trim();
-                    const receivable = parseFloat((row[receivableIdx]?.toString() || '0').replace(/,/g, '')) || 0;
-                    const planAmount = parseFloat((row[planIdx]?.toString() || '0').replace(/,/g, '')) || 0;
 
-                    if (!name) { failed.push(`行 ${i+1}: 客户名称为空`); continue; }
-                    if (!salesUsername) { failed.push(`行 ${i+1}: 业务员用户名为空`); continue; }
+                // 查询客户是否存在
+                let { data: existingCust } = await supabaseClient
+                    .from('customers')
+                    .select('*')
+                    .eq('name', name)
+                    .maybeSingle();
 
-                    const lowerUsername = salesUsername.trim().toLowerCase();
-                    const salesUser = allUsers.find(u => u.username.toLowerCase().trim() === lowerUsername);
-                    if (!salesUser) {
-                        failed.push(`行 ${i+1}: 业务员 ${salesUsername} 不存在`);
+                if (existingCust) {
+                    // 更新客户信息
+                    const { error: updErr } = await supabaseClient
+                        .from('customers')
+                        .update({ sales_id: salesUser.id, receivable })
+                        .eq('id', existingCust.id);
+                    if (updErr) {
+                        failed.push(`行 ${i+1}: 更新客户失败 ${updErr.message}`);
                         continue;
                     }
+                } else {
+                    // 插入新客户
+                    const { data: newCust, error: custErr } = await supabaseClient
+                        .from('customers')
+                        .insert({ name, sales_id: salesUser.id, receivable })
+                        .select()
+                        .single();
+                    if (custErr) {
+                        failed.push(`行 ${i+1}: 插入客户失败 ${custErr.message}`);
+                        continue;
+                    }
+                    existingCust = newCust; // 统一变量名方便后续使用
+                }
 
-                    const existing = allCustomers.find(c => c.name === name);
-                    if (existing) {
-                        const { error: updErr } = await supabaseClient.from('customers').update({
-                            sales_id: salesUser.id,
-                            receivable
-                        }).eq('id', existing.id);
-                        if (updErr) { failed.push(`行 ${i+1}: 更新客户失败 ${updErr.message}`); continue; }
-                      const monthStart = formatMonthStart(new Date());
+                // 处理月度计划
+                const monthStart = formatMonthStart(new Date());
+                const { data: existingCol, error: queryErr } = await supabaseClient
+                    .from('collections')
+                    .select('id, actual_amount')
+                    .eq('customer_id', existingCust.id)
+                    .eq('month_start', monthStart)
+                    .maybeSingle();
 
-// 实时查询当月是否存在记录
-const { data: existingCol, error: queryErr } = await supabaseClient
-    .from('collections')
-    .select('id, actual_amount')
-    .eq('customer_id', existing.id)
-    .eq('month_start', monthStart)
-    .maybeSingle();
+                if (queryErr) {
+                    failed.push(`行 ${i+1}: 查询计划失败 ${queryErr.message}`);
+                    continue;
+                }
 
-if (queryErr) {
-    failed.push(`行 ${i+1}: 查询计划失败 ${queryErr.message}`);
-    continue;
-}
-
-if (existingCol) {
-    // 存在则只更新计划金额，保留原实收金额
-    const { error: colErr } = await supabaseClient
-        .from('collections')
-        .update({ plan_amount: planAmount })
-        .eq('id', existingCol.id);
-    if (colErr) failed.push(`行 ${i+1}: 更新计划失败 ${colErr.message}`);
-    else success.push(name);
-} else {
-    // 不存在则插入新计划，实收为 0
-    const { error: colErr } = await supabaseClient
-        .from('collections')
-        .insert({
-            customer_id: existing.id,
-            sales_id: salesUser.id,
-            month_start: monthStart,
-            plan_amount: planAmount,
-            actual_amount: 0
-        });
-    if (colErr) failed.push(`行 ${i+1}: 插入计划失败 ${colErr.message}`);
-    else success.push(name);
-}else {
-                            const { error: colErr } = await supabaseClient.from('collections').insert({
-                                customer_id: existing.id,
-                                sales_id: salesUser.id,
-                                month_start: monthStart,
-                                plan_amount: planAmount,
-                                actual_amount: 0
-                            });
-                            if (colErr) failed.push(`行 ${i+1}: 插入计划失败 ${colErr.message}`);
-                            else success.push(name);
-                        }
+                if (existingCol) {
+                    // 更新计划金额，保留原实收
+                    const { error: colErr } = await supabaseClient
+                        .from('collections')
+                        .update({ plan_amount: planAmount })
+                        .eq('id', existingCol.id);
+                    if (colErr) {
+                        failed.push(`行 ${i+1}: 更新计划失败 ${colErr.message}`);
                     } else {
-                        const { data: newCust, error: custErr } = await supabaseClient.from('customers').insert({
-                            name,
-                            sales_id: salesUser.id,
-                            receivable
-                        }).select().single();
-                        if (custErr) { failed.push(`行 ${i+1}: 插入客户失败 ${custErr.message}`); continue; }
-                        const monthStart = formatMonthStart(new Date());
-                        const { error: colErr } = await supabaseClient.from('collections').insert({
-                            customer_id: newCust.id,
+                        success.push(name);
+                    }
+                } else {
+                    // 插入新计划，实收为0
+                    const { error: colErr } = await supabaseClient
+                        .from('collections')
+                        .insert({
+                            customer_id: existingCust.id,
                             sales_id: salesUser.id,
                             month_start: monthStart,
                             plan_amount: planAmount,
                             actual_amount: 0
                         });
-                        if (colErr) failed.push(`行 ${i+1}: 插入计划失败 ${colErr.message}`);
-                        else success.push(name);
+                    if (colErr) {
+                        failed.push(`行 ${i+1}: 插入计划失败 ${colErr.message}`);
+                    } else {
+                        success.push(name);
                     }
                 }
-                const msg = t.importSuccess.replace('{success}', success.length).replace('{failed}', failed.length) + '\n' +
-                           t.importFailDetail.replace('{details}', failed.join('\n'));
-                document.getElementById('excelImportMessage').innerText = msg;
-                fileInput.value = '';
-                await loadAllData();
-            };
-            reader.readAsArrayBuffer(file);
-        });
+            }
 
+            const msg = t.importSuccess.replace('{success}', success.length).replace('{failed}', failed.length) + '\n' +
+                       t.importFailDetail.replace('{details}', failed.join('\n'));
+            document.getElementById('excelImportMessage').innerText = msg;
+            fileInput.value = '';
+            await loadAllData();
+        } catch (err) {
+            alert('导入过程中发生错误：' + err.message);
+        } finally {
+            document.getElementById('loadingModal').style.display = 'none';
+        }
+    };
+    reader.onerror = () => {
+        document.getElementById('loadingModal').style.display = 'none';
+        alert('文件读取失败');
+    };
+    reader.readAsArrayBuffer(file);
+});
         // JSON导入（同样修复）
         document.getElementById('importCustomersBtn').addEventListener('click', async () => {
             const raw = document.getElementById('importCustomerData').value;
